@@ -181,18 +181,17 @@ courses = {
                "normal_hours": 1,
                "lab_hours": 0,
                "total_hours_per_week": 1
-        }
         },
-       "INTERNSHIP": {
            "SUMMER INTERNSHIP": {
                "subject_code":"BCA484-3",
                "short_name":"INTERNSHIP",
-               "teacher_incharge": ["Class Teacher"],
-               "normal_hours": 0,
+               "teacher_incharge": ["3bca a si"],
+               "normal_hours": 4,
                "lab_hours": 0,
-               "total_hours_per_week": 0
+               "total_hours_per_week": 4
             }
         },
+      
        "HED": {
            "HED": {
                "normal_hours": 1,
@@ -248,18 +247,17 @@ courses = {
                "teacher_incharge": ["3 bca b"],
                "normal_hours": 1,
                "lab_hours": 0,
-               "total_hours_per_week": 1}
-        },
-       "INTERNSHIP": {
-           "SUMMER INTERNSHIP": {
+               "total_hours_per_week": 1},
+             "SUMMER INTERNSHIP": {
                "subject_code":"BCA484-3",
                "short_name":"INTERNSHIP",
-               "teacher_incharge": ["Class Teacher"],
-               "normal_hours": 0,
+               "teacher_incharge": ["3bca b si"],
+               "normal_hours": 4,
                "lab_hours": 0,
-               "total_hours_per_week": 0
+               "total_hours_per_week": 4
             }
         },
+       
        "HED": {
            "HED": {
                "normal_hours": 1,
@@ -500,10 +498,10 @@ courses = {
            "SUMMER INTERNSHIP": {
                "subject_code":"Not Mentioned",
                "short_name":"INTERNSHIP",
-               "teacher_incharge": ["Class Teacher"],
-               "normal_hours": 0,
+               "teacher_incharge": ["3cm si"],
+               "normal_hours": 4,
                "lab_hours": 0,
-               "total_hours_per_week": 0
+               "total_hours_per_week": 4
             },"LIBRARY": {
                "subject_code":"LIB001",
                "short_name":"LIBRARY",
@@ -596,10 +594,10 @@ courses = {
            "SUMMER INTERNSHIP": {
                "subject_code":"Not Mentioned",
                "short_name":"INTERNSHIP",
-               "teacher_incharge": ["Class Teacher"],
-               "normal_hours": 0,
+               "teacher_incharge": ["3cs si"],
+               "normal_hours": 4,
                "lab_hours": 0,
-               "total_hours_per_week": 0
+               "total_hours_per_week": 4
             },"LIBRARY": {
                "subject_code":"LIB001",
                "short_name":"LIBRARY",
@@ -743,7 +741,7 @@ short_teachers = {
    "Dr SANDEEP J":"SD",
    "Dr SANGEETHA GOVINDA":"SG",
    "Dr SARAVANAKUMAR K":"SK",
-   "Dr SARAVANAN K N":"KNS",
+   "Dr SARAVANAN KN":"KNS",
    "Dr SHONY SEBASTIAN":"SS",
    "Dr SMITHA VINOD":"SV",
    "Dr SOMNATH SINHA":"SOM",
@@ -755,10 +753,10 @@ short_teachers = {
    "Dr VAIDHEHI V":"VV",
    "Dr VIJAY ARPUTHARAJ":"VA",
    "Dr VINEETHA KR":"VKR",
-   "Dr Amrutha K":"AMR",
+   "Dr Amrutha ":"AMR",
    "Dr Smera":"SME",
    "Dr Chanti":"CHA",
-   "Dr New begin":"NEB",
+   "Dr Newbegin":"NEB",
    "Dr Manasa":"MAN",
    "Dr LOKESHWARAN":"LJ",
    "Dr CYNTHIA":"CYN",
@@ -880,6 +878,11 @@ list2 = ["Dr SARAVANAKUMAR K", "Dr SANGEETHA GOVINDA", "Dr SMERA"]
 
 
 list3 = ["Dr RAMAMURTHY B", "Dr AMRUTHA"]
+
+# Converting all elements to upper case
+list1 = [name.upper() for name in list1]
+list2 = [name.upper() for name in list2]
+list3 = [name.upper() for name in list3]
 
 
 
