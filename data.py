@@ -76,7 +76,7 @@ courses = {
                "subject_code":"BCA102-1",
                "short_name":"OOP",
                "proposed_timing":"BATCH IV : 9.30am-3.30pm",
-               "teacher_incharge": ["Dr SARAVANAN K N","Dr LOKESHWARAN"],
+               "teacher_incharge": ["Dr SARAVANAN KN","Dr LOKESHWARAN"],
                "normal_hours": 2,
                "lab_hours": 4,
                "total_hours_per_week": 6
@@ -292,16 +292,17 @@ courses = {
                "subject_code":"BCA581",
                "short_name":"PRJ",
                "teacher_incharge": ["Dr VIJAY ARPUTHARAJ"],
-               "normal_hours": 0,
-               "lab_hours": 4,
+               "normal_hours": 2,
+               "lab_hours": 2,
                "total_hours_per_week": 4
-            },"LIBRARY": {
-               "subject_code":"LIB001",
-               "short_name":"LIBRARY",
-               "teacher_incharge": ["5 bca a"],
-               "normal_hours": 1,
-               "lab_hours": 0,
-               "total_hours_per_week": 1}
+            },
+        #    "LIBRARY": {
+        #        "subject_code":"LIB001",
+        #        "short_name":"LIBRARY",
+        #        "teacher_incharge": ["5 bca a"],
+        #        "normal_hours": 1,
+        #        "lab_hours": 0,
+        #        "total_hours_per_week": 1}
            
            
         },
@@ -340,7 +341,9 @@ courses = {
                "lab_hours": 0,
                "total_hours_per_week": 4
             }
-        }
+        },
+       "act":{}
+       
     },
    "5BCA B": {
         # 28hr
@@ -366,16 +369,17 @@ courses = {
                "subject_code":"BCA581",
                "short_name":"PRJ",
                "teacher_incharge": ["Dr SHAMINE"],
-               "normal_hours": 0,
-               "lab_hours": 4,
+               "normal_hours": 2,
+               "lab_hours": 2,
                "total_hours_per_week": 4
-            },"LIBRARY": {
-               "subject_code":"LIB001",
-               "short_name":"LIBRARY",
-               "teacher_incharge": ["5 bca b"],
-               "normal_hours": 1,
-               "lab_hours": 0,
-               "total_hours_per_week": 1}
+            },
+        #    "LIBRARY": {
+        #        "subject_code":"LIB001",
+        #        "short_name":"LIBRARY",
+        #        "teacher_incharge": ["5 bca b"],
+        #        "normal_hours": 1,
+        #        "lab_hours": 0,
+        #        "total_hours_per_week": 1}
         },
        "ELECTIVE-I": {
            "GRAPHICS AND ANIMATION": {
@@ -412,7 +416,7 @@ courses = {
                "lab_hours": 0,
                "total_hours_per_week": 4
             }
-        },
+        },"act":{}
     },
     
     
@@ -654,7 +658,11 @@ courses = {
         },
        "NOT MORNING":{}
         
-    }
+    },
+   "BCOM-I":{},
+   "BCOM-II":{},
+   "BCOM-III":{},
+   
 }
 
     
@@ -709,7 +717,6 @@ for classz, classinfo in courses.items():
                     # print(f"Adding '{sub_name}' to shortsub with short name '{sub_details['short_name']}'")
                     # Add the subject name and its short name from sub_details to shortsub
                     shortsub[sub_name] = sub_details['short_name']
-
 short_teachers = {
    "Dr ANITA H B":"AN",
    "Dr AROKIA PAUL RAJAN R":"APR",
@@ -780,7 +787,10 @@ CLASSES={"1BCA A":None,
         "3CS":None,
         "1CM":None,
         "3CM":None,
-        "5CME":None}
+        "5CME":None,
+        "BCOM-I":None,
+        "BCOM-III":None,
+        "BCOM-II":None,}
 
 # Calculate total hours for each course
 TOTALHR = {}
@@ -823,7 +833,7 @@ for course, details in courses.items():
 
                 
 
-n_m=[x for x in courses.keys() if"NOT MORNING" in x ]
+n_m=[x for x,j in courses.items() if"NOT MORNING" in j ]
 
 m=list(set(courses.keys())-set(n_m))
 
@@ -836,7 +846,7 @@ ele_sub =list(set(
     for subject in courses[key]['ELECTIVE-I'].keys()  # Get the subjects for"ELECTIVE-I"
 ))
 
-# print(ele)
+# print(ele_sub)
 
 
 # lab_hr={}
@@ -861,7 +871,7 @@ ele_sub =list(set(
                 
                 
                 
-#                 # Strip spaces from each teacher's name and capitalize them
+                # Strip spaces from each teacher's name and capitalize them
                 
 
 # import pprint
@@ -880,6 +890,7 @@ list2 = ["Dr SARAVANAKUMAR K", "Dr SANGEETHA GOVINDA", "Dr SMERA"]
 list3 = ["Dr RAMAMURTHY B", "Dr AMRUTHA"]
 
 # Converting all elements to upper case
+print(list1)
 list1 = [name.upper() for name in list1]
 list2 = [name.upper() for name in list2]
 list3 = [name.upper() for name in list3]
