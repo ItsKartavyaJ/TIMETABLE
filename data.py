@@ -1,3 +1,86 @@
+
+
+# # def print_courses_table(courses):
+# #     # Print overall headers
+# #     subig=["GRAPHICS AND ANIMATION","CYBER SECURITY"]
+# #     classig=["1BCA B","3BCA B","5BCA B",]
+# #     print(f"{'Class Name':<10} {'Subject Name':<40} {'Theory Hours':<15} {'Lab Hours':<10} {'Total Hours':<10}")
+# #     print("=" * 85)
+
+# #     # Initialize overall total hours
+# #     grand_total_hours = 0
+
+# #     # Iterate through each class
+# #     for class_name, categories in courses.items():
+# #         if class_name not in classig:
+# #             total_hours_for_class = 0  # Reset total for the class
+# #             # Print class header
+# #             print(f"\n{class_name}")
+# #             print("-" * 60)
+
+# #             # Iterate through categories and subjects
+# #             for category, subjects in categories.items():
+# #                 for subject_name, details in subjects.items():
+# #                     if subject_name not in subig: 
+# #                         lab_hours = details.get('lab_hours', 0)
+# #                         theory_hours = details.get('normal_hours', 0)
+# #                         total_hours = lab_hours + theory_hours
+# #                         total_hours_for_class += total_hours
+
+# #                         # Print subject details
+# #                         print(f"{subject_name:<40} {theory_hours:<15} {lab_hours:<10} {total_hours:<10}")
+
+# #             # Print total for the class
+# #             print(f"{'Total for ' + class_name:<40} {'':<15} {'':<10} {total_hours_for_class:<10}")
+            
+# #             # Update grand total
+# #             grand_total_hours += total_hours_for_class
+
+# #         # Print grand total for all classes
+# #     print("=" * 85)
+# #     print(f"{'Grand Total':<40} {'':<15} {'':<10} {grand_total_hours:<10}")
+
+# # # Example usage
+# # print_courses_table(courses)
+
+
+
+
+# # Calculate total hours for each course
+# TOTALHR = {}
+# for course, details in courses.items():
+#     total_hours = 0
+#     for section, subjects in details.items():
+#         elective_counted = False
+#         for subject, info in subjects.items():
+#             if "ELECTIVE" in section.upper() or "Elective" in section:
+#                 if not elective_counted:
+#                     total_hours += info.get("total_hours_per_week", 0)
+#                     elective_counted = True
+#             else:
+#                 total_hours += info.get("total_hours_per_week", 0)
+#     TOTALHR[course] = total_hours
+
+# # Sort the courses by total hours in descending order
+# courses = dict(sorted(courses.items(), key=lambda item: TOTALHR[item[0]], reverse=True))
+
+# # Function to sort subjects by lab hours and normal hours
+# def sort_subjects_by_lab_hours(courses):
+#     for course, details in courses.items():
+#         for section, subjects in details.items():
+#             # Sort subjects by lab_hours (descending) and then by normal_hours (ascending)
+#             sorted_subjects = sorted(
+#                 subjects.items(),
+#                 key=lambda item: (-item[1].get('lab_hours', 0), -item[1].get('normal_hours', float('inf')))
+#             )
+#             details[section] = {subject_name: info for subject_name, info in sorted_subjects}
+#     return courses
+
+# # Sort subjects within each course
+# courses = sort_subjects_by_lab_hours(courses)
+
+# CLASSES={k:None for k in courses.keys()}
+
 courses = {
    "1BCA A": {
         # 
@@ -149,7 +232,7 @@ courses = {
             },
            "INTRODUCTION TO PYTHON": {
                "subject_code":"BCA263",
-               "short_name":"PYTHON",
+               "short_name":"PY",
                "teacher_incharge": ["Dr MOHANA PRIYA T","Dr VIJAY ARPUTHARAJ"],
                "normal_hours": 2,
                "lab_hours": 2,
@@ -217,7 +300,7 @@ courses = {
             },
            "INTRODUCTION TO PYTHON": {
                "subject_code":"BCA263",
-               "short_name":"PYTHON",
+               "short_name":"PY",
                "teacher_incharge": ["Dr RESMI KR","Dr HUBERT SHANTHAN"],
                "normal_hours": 2,
                "lab_hours": 2,
@@ -493,7 +576,7 @@ courses = {
        "NORMAL": {
            "DATA ANALYSIS USING PYTHON": {
                "subject_code":"CSC262-3C",
-               "short_name":"PYTHON",
+               "short_name":"DAP",
                "teacher_incharge": ["Dr RAMAMURTHY B"],
                "normal_hours": 2,
                "lab_hours": 2,
@@ -665,48 +748,7 @@ courses = {
    
 }
 
-    
-    
-
-
-
-
-
-
-shortsub = {
-   "OBJECT ORIENTED PROGRAMMING USING C++":"OOP",
-   "PRINCIPLES OF SOFTWARE DEVELOPMENT – 1":"PSD",
-   "INTRODUCTION TO WEB TECHNOLOGY":"IWT",
-   "DATA STRUCTURES AND ALGORITHMS":"DSA",
-   "DATABASE MANAGEMENT SYSTEMS":"DBMS",
-   "MOBILE APPLICATIONS":"MA",
-   "OPERATING SYSTEM":"OS",
-   "INTRODUCTION TO PYTHON":"PYTHON",
-   "COMPUTER NETWORKS":"CN",
-   "DISCRETE MATHEMATICS":"DM",
-   "SYSTEMS PROGRAMMING":"SP",
-   "MULTIMEDIA SYSTEMS":"MS",
-   "WEB PROGRAMMING":"WP",
-   "COMPUTER GRAPHICS":"CG",
-   "OBJECT ORIENTED PROGRAMMING USING JAVA":"OOJ",
-   "SOFTWARE ENGINEERING":"SE",
-   "HUMAN-COMPUTER INTERACTION":"HCI",
-   "PROGRAMMING IN C":"C",
-   "MOBILE APPLICATION DEVELOPMENT":"MAD",
-   "COMPUTER ARCHITECTURE":"CA",
-   "COMPUTER ORGANIZATION":"CO",
-   "DATA COMMUNICATION":"DC",
-   "MANAGEMENT INFORMATION SYSTEM":"MIS",
-   "FINANCIAL ACCOUNTING":"FA",
-   "BUSINESS COMMUNICATION":"BC",
-   "GRAPHICS AND ANIMATION":"GA",
-   "WEB TECHNOLOGY":"WT",
-   "BUSINESS INTELLIGENCE":"BI",
-   "MULTIMEDIA APPLICATIONS":"MUL",
-   "CYBER SECURITY":"CS",
-   "PROJECT-I":"PRJ"
-    
-}
+shortsub = {}
 
 for classz, classinfo in courses.items():
     for category, subject_info in classinfo.items():
@@ -717,6 +759,7 @@ for classz, classinfo in courses.items():
                     # print(f"Adding '{sub_name}' to shortsub with short name '{sub_details['short_name']}'")
                     # Add the subject name and its short name from sub_details to shortsub
                     shortsub[sub_name] = sub_details['short_name']
+
 short_teachers = {
    "Dr ANITA H B":"AN",
    "Dr AROKIA PAUL RAJAN R":"APR",
@@ -765,32 +808,16 @@ short_teachers = {
    "Dr Chanti":"CHA",
    "Dr Newbegin":"NEB",
    "Dr Manasa":"MAN",
+   "Dr SHAMINE":"SH",
    "Dr LOKESHWARAN":"LJ",
    "Dr CYNTHIA":"CYN",
    "Dr RAINA":"RA",
-   "Dr SHAMINE":"SH"
+   
 }
 
 short_teachers = {key.upper().strip(): value for key, value in short_teachers.items()}
 
-
-
-
-
-CLASSES={"1BCA A":None,
-        "1BCA B":None,
-        "3BCA A":None,
-        "3BCA B":None,
-        "5BCA A":None,
-        "5BCA B":None,
-        "1CS":None,
-        "3CS":None,
-        "1CM":None,
-        "3CM":None,
-        "5CME":None,
-        "BCOM-I":None,
-        "BCOM-III":None,
-        "BCOM-II":None,}
+CLASSES_t={x:None for x in courses.keys() if x not in ["BCOM-I","BCOM-II","BCOM-III"]}
 
 # Calculate total hours for each course
 TOTALHR = {}
@@ -809,16 +836,13 @@ for course, details in courses.items():
                 total_hours += info.get("total_hours_per_week", 0)
     
     TOTALHR[course] = total_hours
-
-
-    
     
 
 
     
 # Sort the courses by total hours in descending order
 courses = dict(sorted(courses.items(), key=lambda item: TOTALHR[item[0]], reverse=True))
-
+CLASSES={x:None for x in courses.keys()}
 
 for course, details in courses.items():
     for section, subjects in details.items():
@@ -849,27 +873,6 @@ ele_sub =list(set(
 # print(ele_sub)
 
 
-# lab_hr={}
-# th_hr={}
-# sub_ig=["HED","MATHEMATICS","MDC","LIBRARY"]
-# for course, details in courses.items():
-#     for section, subjects in details.items():
-#         for subject, info in subjects.items():
-#             # Ensure the key exists before processing
-#             if "normal_hours" in  info and subject not in sub_ig:
-#                 th_hr[(course,subject)]=info["normal_hours"]
-
-            
-#             if"lab_hours" in info:
-#                 if info["lab_hours"]==0:
-#                     continue
-#                 if info["lab_hours"]==4:
-#                     lab_hr[(course,subject)]=2*5
-#                 else:
-#                     lab_hr[(course,subject)]=info["lab_hours"]*5
-                
-                
-                
                 
                 # Strip spaces from each teacher's name and capitalize them
                 
@@ -890,7 +893,7 @@ list2 = ["Dr SARAVANAKUMAR K", "Dr SANGEETHA GOVINDA", "Dr SMERA"]
 list3 = ["Dr RAMAMURTHY B", "Dr AMRUTHA"]
 
 # Converting all elements to upper case
-print(list1)
+# print(list1)
 list1 = [name.upper() for name in list1]
 list2 = [name.upper() for name in list2]
 list3 = [name.upper() for name in list3]
@@ -909,4 +912,51 @@ list3 = [name.upper() for name in list3]
 #         for subject, info in subjects.items():
 #             print(f"  {subject} - Total Hours: {info['total_hours_per_week']}")
 
+
+def print_courses_table(courses):
+    # Print overall headers
+    print(f"{'Subject Name':<40} {'Theory Hours':<15} {'Lab Hours':<10} {'Total Hours':<10}")
+    print("=" * 85)
+    classig=["5BCA B","3BCA B","1BCA B","BCOM-II","BCOM-I","BCOM-III"]
+    subig=["MDC","LIBRARY","HED","MATHEMATICS"]
+    # Initialize overall total hours
+    grand_total_hours = 0
+
+    # Iterate through each class
+    for class_name, categories in courses.items():
+        total_hours_for_class = 0  # Reset total for the class
+        if  class_name in classig:
+            continue
+
+
+        # Print class header
+        print(f"\nclass name= {class_name}")
+        print("-" * 85)
+
+        # Iterate through categories and subjects
+        for category, subjects in categories.items():
+            for subject_name, details in subjects.items():
+                if subject_name in  subig:
+                    continue
+
+                lab_hours = details.get('lab_hours', 0)
+                theory_hours = details.get('normal_hours', 0)
+                total_hours = lab_hours + theory_hours
+                total_hours_for_class += total_hours
+
+                # Print subject details
+                print(f"{shortsub[subject_name]:<40} {theory_hours:<15} {lab_hours:<10} {total_hours:<10}")
+
+        # Print total for the class
+        print(f"{'Total for ' + class_name:<40} {'':<15} {'':<10} {total_hours_for_class:<10}")
+        
+        # Update grand total
+        grand_total_hours += total_hours_for_class
+
+    # Print grand total for all classes
+    print("=" * 85)
+    print(f"{'Grand Total':<40} {'':<15} {'':<10} {grand_total_hours:<10}")
+
+# Example usage
+print_courses_table(courses)
 
