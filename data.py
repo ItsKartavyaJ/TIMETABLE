@@ -605,6 +605,7 @@ courses = {
                 "teacher_incharge": ["--"],
             }
         },"act":{},
+        "language":{}
     },
     
    "1CS": {
@@ -655,6 +656,7 @@ courses = {
        "NOT MORNING":{},
        "act":{},
        "language":{}
+       
     },
    "3CS": {
         # 10 hr
@@ -701,6 +703,7 @@ courses = {
                "teacher_incharge": ["--"],
             }
         },"act":{},
+        "language":{}
     },
    "5CME": {
        "NORMAL": {

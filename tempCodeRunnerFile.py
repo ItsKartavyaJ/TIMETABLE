@@ -1,1 +1,0 @@
- self.labs_assigned_per_hour[day]
