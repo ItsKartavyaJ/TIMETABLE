@@ -7,6 +7,10 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from data import courses, short_teachers, shortsub,CLASSES,n_m,m,ele,ele_sub,list1,list2,list3,CLASSES_t,cc
 
+
+
+
+
 class TimetableGenerator:
     def __init__(self, courses, num_days=6, num_hours=9):
         self.courses = courses
@@ -31,8 +35,12 @@ class TimetableGenerator:
 
         # Pre-assign subjects
         self.pre_assign_subjects(timetable)
+        
+        # print(self.find_free_slots_closest_to_six(timetable))
+      
 
-         # # Assign LCA subjects to the first two hours of the day
+        
+         # Assign LCA subjects to the first two hours of the day
         self.assign_lca_and_lab_hours(timetable, allocated_subjects, lab_assigned_per_day)
         
   
@@ -60,6 +68,8 @@ class TimetableGenerator:
         
         
         self.cross_verify_timetable_with_courses(timetable)
+        
+       
         
         
         self.timetable = timetable
@@ -749,14 +759,22 @@ class TimetableGenerator:
         
         if 'language' in self.courses[class_name]:
             if class_name in n_m:
+                # Thursday (5th period)
                 timetable[4][class_name][4].append(("English", []))
+                # Friday (4th period)
                 timetable[4][class_name][3].append(("English", [])) 
             elif class_name in m:
                 if class_name in ["3CS","3CM"]:
+                    
+                     # wed (5th period)
                     timetable[2][class_name][4].append(("language", []))
+                    # Thursday (6th period)
                     timetable[4][class_name][5].append(("language", [])) 
+                     # Tuesday (4th period)
+                    
                 else:
                     timetable[1][class_name][3].append(("language", []))
+                    # Thursday (4th period)
                     timetable[3][class_name][3].append(("language", [])) 
                
 
@@ -805,6 +823,12 @@ class TimetableGenerator:
         - Classes that do not meet this condition but do not have 'NOT MORNING' in their
         metadata ('m') will have later hours blocked instead.
         """
+        if class_name not in ["5BCA A", "5BCA B"]:
+                timetable[5][class_name][6].append(("BLOCKED", []))
+        
+        for hour in [0,1,7, 8]:
+            
+                timetable[5][class_name][hour].append(("BLOCKED", []))
         
         if class_name in n_m:
             # Block first 3 hours for all days except day 5
@@ -813,23 +837,23 @@ class TimetableGenerator:
                     for hour in range(3):
                         timetable[day][class_name][hour].append(("BLOCKED", []))
 
-            # Block specific hours for day 5 (hours: 0, 5, 6, 7, and 8)
-            for hour in [0, 5, 6, 7, 8]:
-                timetable[5][class_name][hour].append(("BLOCKED", []))
+           
 
         # Block all hours after the 5th for classes without 'NOT MORNING'
         elif "NOT MORNING" not in m:
             # Always block hour 0 on day 5
-            timetable[5][class_name][0].append(("BLOCKED", []))
+            # timetable[5][class_name][0].append(("BLOCKED", []))
 
             # Block hour 5 on day 5 unless the class is "5BCA A" or "5BCA B"
             if class_name not in ["5BCA A", "5BCA B"]:
-                timetable[5][class_name][5].append(("BLOCKED", []))
+                timetable[5][class_name][6].append(("BLOCKED", []))
 
             # Block hours from the 6th hour onward for all days
             for hour in range(6, len(timetable[0][class_name])):
                 for day in range(self.num_days):
-                    timetable[day][class_name][hour].append(("BLOCKED", []))
+                    if day!=5:
+                        timetable[day][class_name][hour].append(("BLOCKED", []))
+        
 
 
 
