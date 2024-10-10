@@ -908,62 +908,74 @@ def print_courses_table(courses):
     print("=" * 85)
     print(f"{'Grand Total':<40} {'':<15} {'':<10} {grand_total_hours:<10}")
 
-# # Example usage
-# # print_courses_table(courses)
-# import pandas as pd
-# from openpyxl import load_workbook
-# from openpyxl.utils.dataframe import dataframe_to_rows
-# from openpyxl.styles import Alignment
+# Example usage
+# print_courses_table(courses)
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.styles import Alignment
 
-# # Initialize an empty list to hold the data rows
-# data = []
+# Initialize an empty list to hold the data rows
+data = []
 
-# # Iterate through the courses dictionary
-# for class_name, categories in courses.items():
-#     class_written = False  # Flag to track if the class name has been written
-#     for category, subjects in categories.items():
-#         for subject_name, details in subjects.items():
-#             if 'subject_code' in details and 'teacher_incharge' in details:
-#                 # Add the row. Only write the class name if it hasn't been written for this class yet
-#                 data.append({
-#                     "Class Name": class_name if not class_written else "",
-#                     "Subject Code": details['subject_code'],
-#                     "Subject Name": subject_name,
-#                     "Teacher Incharge": ', '.join(details['teacher_incharge'])  # Join the list of teachers
-#                 })
-#                 class_written = True  # Mark that the class name has been written
-#     # Add two empty rows after each class
-#     data.append({"Class Name": "", "Subject Code": "", "Subject Name": "", "Teacher Incharge": ""})
-#     data.append({"Class Name": "", "Subject Code": "", "Subject Name": "", "Teacher Incharge": ""})
+# Iterate through the courses dictionary
+for class_name, categories in courses.items():
+    class_written = False  # Flag to track if the class name has been written
+    for category, subjects in categories.items():
+        for subject_name, details in subjects.items():
+            if 'subject_code' in details and 'teacher_incharge' in details:
+                # Add the row. Only write the class name if it hasn't been written for this class yet
+                # print(details)
+                
+                if  "lab_hours" in details and details["lab_hours"] >0:
+                    # print("jhguh")
+                    data.append({
+                    "Class Name": class_name if not class_written else "",
+                    "Subject Code": details['subject_code'],
+                    "Subject Name": (subject_name+"Lab"),
+                    "Teacher Incharge": ', '.join(details['teacher_incharge'])  # Join the list of teachers
+                })
+                    
+                else:
+                    data.append({
+                        "Class Name": class_name if not class_written else "",
+                        "Subject Code": details['subject_code'],
+                        "Subject Name": subject_name,
+                        "Teacher Incharge": ', '.join(details['teacher_incharge'])  # Join the list of teachers
+                    })
+    class_written = True  # Mark that the class name has been written
+    # Add two empty rows after each class
+    data.append({"Class Name": "", "Subject Code": "", "Subject Name": "", "Teacher Incharge": ""})
+    data.append({"Class Name": "", "Subject Code": "", "Subject Name": "", "Teacher Incharge": ""})
 
-# # Create a DataFrame from the data list
-# df = pd.DataFrame(data)
+# Create a DataFrame from the data list
+df = pd.DataFrame(data)
 
-# # Write the DataFrame to an Excel file using pandas
-# df.to_excel('courses_timetable.xlsx', index=False)
+# Write the DataFrame to an Excel file using pandas
+df.to_excel('courses_timetable.xlsx', index=False)
 
-# # Open the created Excel file with openpyxl to adjust formatting
-# wb = load_workbook('courses_timetable.xlsx')
-# ws = wb.active
+# Open the created Excel file with openpyxl to adjust formatting
+wb = load_workbook('courses_timetable.xlsx')
+ws = wb.active
 
-# # Adjust column sizes based on content
-# for column_cells in ws.columns:
-#     max_length = 0
-#     column = column_cells[0].column_letter  # Get the column letter
-#     for cell in column_cells:
-#         try:
-#             if cell.value:
-#                 max_length = max(max_length, len(str(cell.value)))  # Get the max length of content in column
-#         except:
-#             pass
-#     adjusted_width = max_length + 4  # Add some padding
-#     ws.column_dimensions[column].width = adjusted_width
+# Adjust column sizes based on content
+for column_cells in ws.columns:
+    max_length = 0
+    column = column_cells[0].column_letter  # Get the column letter
+    for cell in column_cells:
+        try:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))  # Get the max length of content in column
+        except:
+            pass
+    adjusted_width = max_length + 4  # Add some padding
+    ws.column_dimensions[column].width = adjusted_width
 
-# # Save the modified workbook
-# wb.save('courses_timetable.xlsx')
+# Save the modified workbook
+wb.save('courses_timetable.xlsx')
 
-# print("Excel file 'courses_timetable.xlsx' created and formatted successfully.")
-import pprint
+print("Excel file 'courses_timetable.xlsx' created and formatted successfully.")
+# import pprint
 cc = dict()
 for class_name, info in courses.items():
     cc[class_name] = dict()  # Initialize a dictionary for each class name
@@ -972,5 +984,3 @@ for class_name, info in courses.items():
             if "subject_code" in details:
                 cc[class_name][subject_name] = details["subject_code"]
 
-
-pprint.pprint(cc["5BCA A"]["PROJECT-I"])
