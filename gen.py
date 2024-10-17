@@ -1,8 +1,11 @@
+import os
 import random
+import pprint
 import openpyxl
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl import load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -17,25 +20,39 @@ class TimetableGenerator:
         self.ct=list(CLASSES_t.keys())
         self.num_days = num_days
         self.num_hours = num_hours
+        self.notmorningteachers=[]
         self.lab_timetables = {
             "BCA Lab": {day: {hour: [] for hour in range(num_hours)} for day in range(num_days)},
             "MCA Lab": {day: {hour: [] for hour in range(num_hours)} for day in range(num_days)},
             "BSc Lab": {day: {hour: [] for hour in range(num_hours)} for day in range(num_days)}
         }
+        for h in range(self.num_hours):
+            self.lab_timetables["MCA Lab"][5][h].append(("NULL", "NULL"))
         self.teacher_schedule = {day: {hour: set() for hour in range(num_hours)} for day in range(num_days)}  # Initialize teacher_schedule
         self.labs_assigned_per_hour = {day: {hour: 0 for hour in range(self.num_hours)} for day in range(self.num_days)}
         self.lab_teachers = {class_name: {subject: [] for category in categories.values() for subject in category.keys()}
                 for class_name, categories in courses.items()}        
         self.timetable = None  # Initialize timetable as None
     def generate_timetable(self):
+        
+        
         # Initialize timetable structure
         timetable = self.initialize_timetable()
+        # pprint.pprint(timetable)
         allocated_subjects, theory_hours_assigned, lab_assigned_per_day, teacher_schedule = self.initialize_tracking_structures()
-
+        self.blockteachers(self.notmorningteachers)
         # Pre-assign subjects
         self.pre_assign_subjects(timetable)
+        blocklib=None
+        temp=self.find_free_slots_closest_to_six(timetable)
+        for i,j in temp.items():
+            if i==5:
+                continue
+            if 5 in j:
+                blocklib=i
+        self.pre_assign_extra_subjects(timetable,blocklib)
         
-        # print(self.find_free_slots_closest_to_six(timetable))
+       
       
 
         
@@ -68,6 +85,8 @@ class TimetableGenerator:
         
         self.cross_verify_timetable_with_courses(timetable)
         
+        # pprint.pprint(self.lab_teachers)
+        
        
         
         
@@ -76,6 +95,15 @@ class TimetableGenerator:
         # pprint.pprint(timetable)
 
         return timetable
+    
+    def blockteachers(self,notmorningteachers):
+        for i in notmorningteachers:
+            for d in range(self.num_days):
+                for hr in range(0,2):
+                    self.teacher_schedule[d][hr].add(i)  # Block the teacher's schedule
+
+       
+                
     
     def find_free_slots_closest_to_six(self, timetable):
         """
@@ -295,14 +323,25 @@ class TimetableGenerator:
 
                 # Ensure we only keep unique teachers again
                 allocated_teachers = list(set(allocated_teachers))
-                self.lab_teachers[class_name][subject_name].append(allocated_teachers)
+                if class_name in ele:
+                    self.lab_teachers[ele[0]][subject_name].append(allocated_teachers)
+                    self.lab_teachers[ele[1]][subject_name].append(allocated_teachers)
+                else:
+                    self.lab_teachers[class_name][subject_name].append(allocated_teachers)
+                    
+                    
                 # Block the teacher's schedule for the lab time slots
                 for (day, hour) in lab_time_slots:
                     if hour <= 8:  # Ensure valid hours
                         if allocated_teachers:  # Only update if we have allocated teachers
                             # Update the timetable with the allocated teachers
-                          
-                            timetable[day][class_name][hour].append(("", allocated_teachers))  # Add to the timetable
+                            if class_name in ele:
+                                # print(class_name)
+                                timetable[day][ele[0]][hour].append(("", allocated_teachers))  # Add to the timetable
+                                timetable[day][ele[1]][hour].append(("", allocated_teachers))
+                               
+                            else:
+                                timetable[day][class_name][hour].append(("", allocated_teachers))
 
                             # Block the teacher's schedule for all relevant days and hours
                             for teacher in allocated_teachers:
@@ -334,8 +373,8 @@ class TimetableGenerator:
                     lab_time_slots_set = set(lab_time_slots[0:2])
                     lab_time_slots=lab_time_slots[0:2]
                 else:
-                    lab_time_slots_set = set(lab_time_slots[2:5])
-                    lab_time_slots=lab_time_slots[2:5]
+                    lab_time_slots_set = set(lab_time_slots[0:2])
+                    lab_time_slots=lab_time_slots[0:2]
 
                 # List to track allocated teachers for this lab session
                 allocated_teachers = []
@@ -393,7 +432,7 @@ class TimetableGenerator:
                 allocated_teachers = list(set(allocated_teachers))
 
                 # If less than 5 teachers are allocated, notify
-                if len(allocated_teachers) < 5:
+                if len(allocated_teachers) <= 4:
                     allocated_teachers=self.assign_teachers_to_unassigned_subjects(timetable,allocated_teachers ,class_name, subject_name, lab_time_slots)
                     
 
@@ -420,7 +459,7 @@ class TimetableGenerator:
                             # Block the teacher's schedule for the allocated time slots
                             for teacher in allocated_teachers:
                                 self.teacher_schedule[day][hour].add(teacher)  # Block the teacher's time
-                if len(allocated_teachers) < 5:
+                if len(allocated_teachers) <= 4:
                     print(f"Only {len(allocated_teachers)} teachers could be allocated for {class_name} - {subject_name} lab.")
         
     def assign_teachers_to_unassigned_subjects(self, timetable, allocated_teachers,class_name, subject_name, lab_time_slots):
@@ -712,19 +751,24 @@ class TimetableGenerator:
         """Pre-assign subjects to the timetable."""
         
         for class_name in self.classes:
-            self.commerce(timetable,class_name)
-            self.acc(timetable,class_name)
+           
             self.assign_hed(timetable, class_name)
             self.assign_mdc(timetable, class_name)
+            self.assign_act(timetable,class_name)
+            self.block_hours(timetable, class_name)
+    def pre_assign_extra_subjects(self,timetable,d):
+        for class_name in self.classes:
+            self.commerce(timetable,class_name)
+            self.acc(timetable,class_name)
             self.assign_lunch(timetable, class_name)
             self.assign_language(timetable,class_name)
-            self.assign_act(timetable,class_name)
-            self.assign_lib(timetable,class_name)
-            self.block_hours(timetable, class_name)
+            self.assign_lib(timetable,class_name,d)
             
-    def assign_lib(self,timetable,class_name):
-        if "LIBRARY" in courses[class_name]:
-            timetable[3][class_name][5].append(("Library",["lib"]))
+    def assign_lib(self,timetable,class_name,d):
+        # print(d)
+        # if "LIBRARY" in courses[class_name]:
+        if  not timetable[1][class_name][5]:
+            timetable[d][class_name][5].append(("Library",["lib"]))
             
     def acc(self,timetable,class_name):
         if class_name in ["3BCA A","3BCA B"]:
@@ -743,10 +787,10 @@ class TimetableGenerator:
                 l = list3
 
             for d in range(4, 6):
-                for hr in range(0, 2):
+                for hr in range(2, 4):
                     if d == 4:
-                        self.teacher_schedule[d][hr].add(l[0])  # Block the teacher's schedule                 
-                        timetable[d][class_name][hr].append((class_name, [l[0]]))
+                        self.teacher_schedule[d][hr-2].add(l[0])  # Block the teacher's schedule                 
+                        timetable[d][class_name][hr-2].append((class_name, [l[0]]))
                     elif d == 5:
                         for x in l:
                             self.teacher_schedule[d][hr].add(x)  # Block the teacher's schedule
@@ -759,8 +803,8 @@ class TimetableGenerator:
     def assign_act(self, timetable, class_name):
         """Pre-assign 'activity' to the specific periods on Wednesday for different classes."""
         
-        if 'act' in self.courses[class_name]:
-                timetable[2][class_name][5].append(("activity", [""]))
+        # if 'act' in self.courses[class_name]:
+        timetable[2][class_name][5].append(("activity", [""]))
   
             
     def assign_language(self, timetable, class_name):
@@ -769,9 +813,9 @@ class TimetableGenerator:
         if 'language' in self.courses[class_name]:
             if class_name in n_m:
                 # Thursday (5th period)
-                timetable[4][class_name][4].append(("English", []))
+                timetable[4][class_name][4].append(("language", []))
                 # Friday (4th period)
-                timetable[4][class_name][3].append(("English", [])) 
+                timetable[4][class_name][3].append(("language", [])) 
             elif class_name in m:
                 if class_name in ["3CS","3CM"]:
                     
@@ -808,7 +852,7 @@ class TimetableGenerator:
             if class_name in n_m:
                 timetable[day][class_name][6].append(("LUNCH", []))  # 7th hour for lunch
             else:
-                timetable[day][class_name][2].append(("LUNCH", []))  # 3rd hour for lunch
+                timetable[day][class_name][2].append(("BREAK", []))  # 3rd hour for lunch
 
     def block_hours(self, timetable, class_name):
         """
@@ -978,7 +1022,7 @@ class TimetableGenerator:
         for class_name, class_data in self.courses.items():
             if class_name in [ele[0]]:
                 for category, subjects in class_data.items():
-                    if category in ["ELECTIVE-I", "Elective-II"]:
+                    if category in ["ELECTIVE-I", "ELECTIVE-II"]:
                         elective_subjects = list(subjects.keys())
                         if len(elective_subjects) < 2:
                             continue  # Skip if less than 2 subjects
@@ -1335,7 +1379,7 @@ class TimetableGenerator:
     def assign_theory_hours(self, timetable, allocated_subjects, theory_hours_assigned, teacher_schedule):
         for class_name, class_data in self.courses.items():
             for category, subjects in class_data.items():
-                if category not in ["LCA", "ELECTIVE-I",  "HED", "MDC","Elective-II","act"]:
+                if category not in ["LCA", "ELECTIVE-I",  "language","HED", "MDC","ELECTIVE-II","act"]:
                     for subject_name, subject_info in subjects.items():
                         normal_hours = subject_info["normal_hours"]
                         teachers_for_subject = subject_info["teacher_incharge"]
@@ -1343,7 +1387,7 @@ class TimetableGenerator:
                         # Proceed only if normal_hours is greater than 0
                         if normal_hours > 0:
                             assigned_theory_hours = 0
-
+                           
                             for day in range(self.num_days):
                                 # Check if assigned theory hours have reached normal_hours limit
                                 if assigned_theory_hours >= normal_hours:
@@ -1367,7 +1411,7 @@ class TimetableGenerator:
                                                 allocated_subjects[day][class_name].add(subject_name)
                                                 assigned_theory_hours += 1  # Increment assigned hours
                                                 break  # Move to the next subject
-
+                                    # print(class_name,subject_name,normal_hours,assigned_theory_hours)
                                     if assigned_theory_hours >= normal_hours:
                                         break  # Exit the loop once normal hours are assigned
 
@@ -1571,7 +1615,7 @@ class TimetableGenerator:
         return free_hours
     
 
-    
+
     def create_class_dataframes(self, timetable):
         all_class_dfs = {}
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -1580,19 +1624,22 @@ class TimetableGenerator:
             data = {day: [] for day in days}
 
             for day in range(self.num_days):
-                for hour in range(self.num_hours):
+                start_hour=0 if class_name in m  else 2
+                end_hour=7 if class_name in m else 9
+                
+                for hour in range(start_hour, end_hour):
                     subjects = timetable[day][class_name][hour]
                     if subjects:
                         subject_info = []
                         for subject in subjects:
                             subject_short_name = shortsub.get(subject[0], subject[0])  # Short form of subject
                             teachers = ', '.join([short_teachers.get(teacher.strip(), teacher) for teacher in subject[1]])  # Short form of teachers
-                            if subject_short_name=="BLOCKED":
+                            if subject_short_name == "BLOCKED":
                                 subject_info.append(f" NA")
                             elif len(subject) == 3:  # Lab
-                                subject_info.append(f" {subject_short_name} (Lab - {subject[2]} by {teachers})")
+                                subject_info.append(f" {subject_short_name} (Lab - {subject[2]} )")
                             else:  # Theory
-                                subject_info.append(f" {subject_short_name} by {teachers}")
+                                subject_info.append(f" {subject_short_name} ")
 
                         # Join subject info with new line for better readability
                         data[days[day]].append('\n'.join(subject_info))
@@ -1600,8 +1647,8 @@ class TimetableGenerator:
                         data[days[day]].append("Free")
 
             # Create DataFrame for this class
-            df = pd.DataFrame(data) 
-            df.index = self.generate_time_intervals(self.num_hours)
+            df = pd.DataFrame(data)
+            df.index = self.generate_time_intervals(start_hour, end_hour)
 
             all_class_dfs[class_name] = df
 
@@ -1609,6 +1656,29 @@ class TimetableGenerator:
             self.adjust_dataframe_cells(df)
 
         return all_class_dfs
+    
+    def generate_time_intervals(self, start_hour=0, end_hour=9):
+        # Define the time intervals as a dictionary
+        time_intervals = {
+            0: '07:30 AM - 08:15 AM',
+            1: '08:15 AM - 09:00 AM',
+            2: '09:00 AM - 09:45 AM',
+            3: '09:45 AM - 10:45 AM',
+            4: '10:45 AM - 11:45 AM',
+            5: '11:45 AM - 12:45 PM',
+            6: '12:45 PM - 01:45 PM',
+            7: '01:45 PM - 02:45 PM',
+            8: '02:45 PM - 03:45 PM',
+        }
+
+        # Return the values from the dictionary based on the specified range
+        return [time_intervals[hour] for hour in range(start_hour, end_hour)]
+
+
+    # Other methods (create_teacher_dataframes, create_lab_dataframes, etc.) can remain unchanged
+
+    
+    
 
     def create_teacher_dataframes(self, timetable):
         all_teacher_dfs = {}
@@ -1638,20 +1708,24 @@ class TimetableGenerator:
                     subject_info = []
                     for class_name in self.classes:
                         subjects = timetable[day][class_name][hour]
+                        
                         for subject in subjects:
                             
                             if teacher in subject[1]:
                                 # print(class_name,subject[0],subject[1])# If teacher is assigned
                                 
-                                subject_short_name = shortsub.get(subject[0], subject[0])  # Short form of subject
-                                subject_info.append(f"{subject_short_name} ({class_name})")
+                                subject_short_name = shortsub.get(subject[0], subject[0])
+                                if len(subject)>=3:# Short form of subject
+                                    subject_info.append(f"{subject_short_name} ({class_name}) {subject[2]}")
+                                else:
+                                    subject_info.append(f"{subject_short_name} ({class_name})")
 
                     # Join subject info with new line for better readability
-                    data[days[day]].append('\n'.join(subject_info) if subject_info else "Free")
+                    data[days[day]].append('\n'.join(subject_info) if subject_info else "--")
 
             # Create DataFrame for this teacher
             df = pd.DataFrame(data)
-            df.index = self.generate_time_intervals(self.num_hours)
+            df.index = self.generate_time_intervals()
             all_teacher_dfs[teacher] = df
 
             # Adjust cell sizes based on content
@@ -1687,7 +1761,7 @@ class TimetableGenerator:
 
             # Create DataFrame for this lab
             df = pd.DataFrame(data)
-            df.index = self.generate_time_intervals(self.num_hours)
+            df.index = self.generate_time_intervals()
             all_lab_dfs[lab] = df
 
             # Adjust cell sizes based on content
@@ -1704,7 +1778,9 @@ class TimetableGenerator:
             data = {day: [] for day in days}
 
             for day in range(self.num_days):
-                for hour in range(self.num_hours):
+                start_hour=0 if class_name in m  else 3
+                end_hour=7 if class_name in m else 9
+                for hour in range(start_hour,end_hour):
                     subjects = timetable[day][class_name][hour]
                     if subjects:
                         subject_info = []
@@ -1729,7 +1805,7 @@ class TimetableGenerator:
 
             # Create DataFrame for this class
             df = pd.DataFrame(data) 
-            df.index = self.generate_time_intervals(self.num_hours)
+            df.index = self.generate_time_intervals(start_hour,end_hour)
 
             all_class_dfs[class_name] = df
 
@@ -1737,6 +1813,9 @@ class TimetableGenerator:
             self.adjust_dataframe_cells(df)
 
         return all_class_dfs
+    
+    
+    
 
 
     def adjust_dataframe_cells(self, df):
@@ -1814,29 +1893,6 @@ class TimetableGenerator:
 
 
 
-    def generate_time_intervals(self, num_hours):
-        # Start time (7:30 AM)
-        start_time = datetime.strptime("07:30", "%H:%M")
-        
-        # List to store the time intervals
-        time_intervals = []
-        
-        # First 3 hours increment by 45 minutes
-        for i in range(3):
-            end_time = start_time + timedelta(minutes=45)  # Each interval is 45 minutes
-            time_intervals.append((start_time, end_time))  # Append as a tuple (start, end)
-            start_time = end_time  # Move the start time forward
-        
-        # After the first 3 hours, increment by 1 hour for the remaining hours
-        for i in range(3, num_hours):
-            end_time = start_time + timedelta(hours=1)  # Each interval is 1 hour
-            time_intervals.append((start_time, end_time))  # Append as a tuple (start, end)
-            start_time = end_time  # Move the start time forward
-        
-        # Format the time intervals to display as strings (start and end times)
-        hour_labels = [f"{start.strftime('%I:%M %p')} - {end.strftime('%I:%M %p')}" for start, end in time_intervals]
-        
-        return hour_labels
     
 
 
@@ -1921,69 +1977,73 @@ class TimetableGenerator:
         new_wb.save(output_file_path)
         # print(f"All sheets have been merged with wrapping into {output_file_path}")
         
+
     def coursett(self):
-        data = []
+        # Create a new workbook
+        wb = Workbook()
 
         # Iterate through the courses dictionary
         for class_name, categories in courses.items():
+            data = []  # Reset data for each class
             class_written = False  # Flag to track if the class name has been written
+
             for category, subjects in categories.items():
                 for subject_name, details in subjects.items():
                     if 'subject_code' in details:
-                        # Add the row. Only write the class name if it hasn't been written for this class yet
-                            # Handle regular subjects
-                            data.append({
-                                "Class Name": class_name if not class_written else "",
-                                "Subject Code": details['subject_code'],
-                                "Subject Name": subject_name,
-                                "Teacher Incharge": ', '.join(details['teacher_incharge'])  # Join the list of teachers
-                            })
-                            class_written = True 
+                        # Handle regular subjects
+                        data.append({
+                            "Class Name": class_name if not class_written else "",
+                            "Subject Code": details['subject_code'],
+                            "Subject Name": shortsub[subject_name],
+                            "Teacher Incharge": ', '.join(details['teacher_incharge'])  # Join the list of teachers
+                        })
+                        class_written = True
                         
-                            if "lab_hours" in details and details["lab_hours"]>0:
-                                flat_teachers = [teacher for sublist in self.lab_teachers[class_name][subject_name] for teacher in sublist]
-    
-   
-                                teachers_in_charge = (
-                                    ", ".join(flat_teachers) if flat_teachers else "No teacher assigned")
-                                data.append({
-                                "Class Name": class_name if not class_written else "",
+                        # Handle lab subjects if applicable
+                        if "lab_hours" in details and details["lab_hours"] > 0:
+                            flat_teachers = [teacher for sublist in self.lab_teachers[class_name][subject_name] for teacher in sublist]
+                            teachers_in_charge = ", ".join(flat_teachers) if flat_teachers else "No teacher assigned"
+
+                            data.append({
+                                "Class Name": "",  # No class name for lab row
                                 "Subject Code": details['subject_code'],
-                                "Subject Name": (subject_name+" Lab"),
-                                "Lab Teacher Incharge": teachers_in_charge  # Join the list of teachers
+                                "Subject Name": shortsub[subject_name]+" Lab",
+                                "Teacher Incharge": teachers_in_charge
                             })
-                                
 
-            # Add two empty rows after each class
+            # Add two empty rows after each class for spacing
             data.append({"Class Name": "", "Subject Code": "", "Subject Name": "", "Teacher Incharge": ""})
             data.append({"Class Name": "", "Subject Code": "", "Subject Name": "", "Teacher Incharge": ""})
 
-        # Create a DataFrame from the data list
-        df = pd.DataFrame(data)
+            # Create a DataFrame from the data list for the current class
+            df = pd.DataFrame(data)
 
-        # Write the DataFrame to an Excel file using pandas
-        df.to_excel('courses_timetable.xlsx', index=False)
+            # Create a new sheet for the current class with the class name as the title
+            ws = wb.create_sheet(title="teachers "+class_name)
 
-        # Open the created Excel file with openpyxl to adjust formatting
-        wb = load_workbook('courses_timetable.xlsx')
-        ws = wb.active
+            # Write the DataFrame to the new sheet
+            for r in dataframe_to_rows(df, index=False, header=True):
+                ws.append(r)
 
-        # Adjust column sizes based on content
-        for column_cells in ws.columns:
-            max_length = 0
-            column = column_cells[0].column_letter  # Get the column letter
-            for cell in column_cells:
-                try:
-                    if cell.value:
-                        max_length = max(max_length, len(str(cell.value)))  # Get the max length of content in column
-                except:
-                    pass
-            adjusted_width = max_length + 4  # Add some padding
-            ws.column_dimensions[column].width = adjusted_width
+            # Adjust column sizes based on content
+            for column_cells in ws.columns:
+                max_length = 0
+                column = column_cells[0].column_letter  # Get the column letter
+                for cell in column_cells:
+                    try:
+                        if cell.value:
+                            max_length = max(max_length, len(str(cell.value)))  # Get the max length of content in column
+                    except Exception as e:
+                        print(f"Error processing cell value: {cell.value}. Error: {e}")
+                adjusted_width = max_length + 4  # Add some padding
+                ws.column_dimensions[column].width = adjusted_width
+
+        # Remove the default sheet created by openpyxl, if it exists
+        if 'Sheet' in wb.sheetnames:
+            wb.remove(wb['Sheet'])
 
         # Save the modified workbook
         wb.save('courses_timetable.xlsx')
-
 
         
 
@@ -1998,7 +2058,7 @@ if __name__ == "__main__":
     # Create DataFrames for each class
     class_dataframes = timetable_generator.create_class_dataframes(timetable)
 
-    # Create DataFrames for each teacher
+    # # Create DataFrames for each teacher
     teacher_dataframes = timetable_generator.create_teacher_dataframes(timetable)
 
     lab_dataframes = timetable_generator.create_lab_dataframes(timetable)
@@ -2011,6 +2071,7 @@ if __name__ == "__main__":
     with pd.ExcelWriter("timetable.xlsx") as writer:
         for class_name, df in class_dataframes.items():
             df.to_excel(writer, sheet_name=class_name, index=True)
+    
     with pd.ExcelWriter("extra_timetable.xlsx") as writer:
         for class_name, df in extra.items():
             df.to_excel(writer, sheet_name=class_name, index=True)
@@ -2031,11 +2092,45 @@ if __name__ == "__main__":
     timetable_generator.style_and_transpose_excel_sheet('teachertimetable.xlsx', 'teachertimetable.xlsx')
     
     timetable_generator.merge_sheets_to_one_wrapped("timetable.xlsx", "timetable.xlsx", 4)
+    timetable_generator.merge_sheets_to_one_wrapped("courses_timetable.xlsx", "courses_timetable.xlsx", 4)
+    
     timetable_generator.merge_sheets_to_one_wrapped("extra_timetable.xlsx", "extra_timetable.xlsx", 4)
     timetable_generator.merge_sheets_to_one_wrapped("Lab_timetable.xlsx", "Lab_timetable.xlsx", 4)
     timetable_generator.merge_sheets_to_one_wrapped("teachertimetable.xlsx", "teachertimetable.xlsx", 4)
+    
+    
+
+    # Define the file paths for both Excel files
+    import pandas as pd
+
+# Define the file paths for both Excel files
+    file1 = 'timetable.xlsx'
+    file2 = 'courses_timetable.xlsx'
+
+    # Create a writer object to write to the merged file
+    writer = pd.ExcelWriter('full_tt.xlsx', engine='openpyxl')
+
+    # Load the first file and write all its sheets to the new file
+    xls1 = pd.ExcelFile(file1)
+    for sheet_name in xls1.sheet_names:
+        # Read each sheet into a DataFrame
+        df = pd.read_excel(file1, sheet_name=sheet_name)
+        # Write each sheet into the merged Excel file
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    # Load the second file and append its sheets to the new file
+    xls2 = pd.ExcelFile(file2)
+    for sheet_name in xls2.sheet_names:
+        # Read each sheet into a DataFrame
+        df = pd.read_excel(file2, sheet_name=sheet_name)
+        # Write each sheet into the merged Excel file with a suffix to avoid name conflicts
+        df.to_excel(writer, sheet_name=sheet_name+"tt" , index=False)
+
+    # Save the merged file
+    writer.close()
+
             
-    print("Timetable saved to 'timetable.xlsx' and 'teachertimetable.xlsx'.")
+    print("Timetable saved to 'timetable.xlsx'")
     
     
  

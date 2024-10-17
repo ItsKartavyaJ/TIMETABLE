@@ -1,1 +1,0 @@
-timetable[day][class_name][hour]=[]
