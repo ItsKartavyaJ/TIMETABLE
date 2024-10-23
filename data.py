@@ -1,17 +1,13 @@
 import ui
 import tkinter as tk
-
-
-
-
 def print_courses_table(courses, shortsub):
     # Print overall headers
     print(f"{'Subject Name':<40} {'Theory Hours':<15} {'Lab Hours':<10} {'Total Hours':<10}")
     print("=" * 85)
 
     # Filter classes or subjects if needed
-    class_ignore = ["5BCA B", "3BCA B", "1BCA B", "BCOM-II", "BCOM-I", "BCOM-III"]
-    subject_ignore = ["MDC", "LIBRARY", "HED", "MATHEMATICS"]
+    class_ignore = ["6BCA A", "4BCA A", "2BCA B", "BCOM-II", "BCOM-I", "BCOM-III"]
+    subject_ignore = [ "LIBRARY", "MATHS"]
 
     grand_total_hours = 0  # Overall total hours
 
@@ -44,28 +40,24 @@ def print_courses_table(courses, shortsub):
 
 
 
-
 # Create a hidden Tkinter root window for UI interactions
 root = tk.Tk()
-root.withdraw()  # Hide the root window since we just need the file dialog
+root.withdraw()  
 
-# Call the function that uploads and processes the file
+
 
 courses = ui.main()
+import pprint
+
+
 # pprint.pprint(courses.keys())
 CLASSES_t={x:None for x in courses.keys() if x not in ["BCOM-I","BCOM-II","BCOM-III"]}
 
-CLASSES={k:None for k in courses.keys()}
 
 # Check if courses were returned and print the output
 if courses is not None:
-    print("Courses loaded successfully.")
-    # pprint.pprint(courses)
-    
-    # ele = ["5BCA A","5BCA B"]
-    # print(ele)
-
-    # Build shortsub dictionary from courses
+    # print("Courses loaded successfully.")
+   
     shortsub = {}
     for classz, classinfo in courses.items():
         for category, subject_info in classinfo.items():
@@ -78,7 +70,7 @@ if courses is not None:
     
     short_teachers = {
     "Dr ANITA H B":"AN",
-    "Dr AROKIA PAUL RAJAN R":"APR",
+    "DR AROKIA PAUL RAJAN":"APR",
     "Dr ASHOK IMMANUEL V":"AI",
     "Dr BEAULAH SOUNDARABAI P":"BE",
     "Dr CECIL DONALD A":"CD",
@@ -101,17 +93,17 @@ if courses is not None:
     "Dr RAJESH KANNA R":"RKR",
     "Dr RAMAMURTHY B":"RM",
     "Dr RAMESH CHANDRA POONIA":"RCP",
-    "Dr RESMI KR":"RES",#
+    "Dr RESMI K R":"RES",#
     "Dr ROHINI V":"RV",#
     "Dr SAGAYA AURELIA P":"SA",#
     "Dr SANDEEP J":"SD",
     "Dr SANGEETHA GOVINDA":"SG",#
     "Dr SARAVANAKUMAR K":"SK",
-    "Dr SARAVANAN KN":"KNS",
+    "Dr SARAVANAN K N":"KNS",
     "Dr SHONY SEBASTIAN":"SS",
     "Dr SMITHA VINOD":"SV",
     "Dr SOMNATH SINHA":"SOM",
-    "Dr SREEJA":"SR",#
+    "DR SREEJA c s":"SR",#
     "Dr SRIDEVI R":"SRI",
     "Dr SUDHAKAR":"SU",
     "Dr SURESH K":"KS",
@@ -121,36 +113,51 @@ if courses is not None:
     "Dr VINEETHA KR":"VKR",#
     "Dr Amrutha ":"AMR",
     "Dr Smera":"SME",
-    "Dr Chanti":"CHA",
-    "Dr Newbegin":"NEB",
-    "Dr Manasa":"MAN",
+    "Dr Chanti s":"CHA",
+    "Dr New begin":"NEB",
+    "Dr MANASA":"MAN",
     "Dr SHAMINE":"SH",
     "Dr LOKESHWARAN":"LJ",
     "Dr CYNTHIA":"CYN",
     "Dr RAINA":"RA",
+    "DR ASHOK IMMANUEL":"AI"
     
     }
 
     short_teachers = {key.upper().strip(): value for key, value in short_teachers.items()}
-       # print(CLASSES_t)
-
+       
     # Calculate total hours for each course
     TOTALHR = {}
     for course, details in courses.items():
         total_hours = 0
+        subjects_hours = []  # List to keep track of hours for subjects
         for section, subjects in details.items():
             elective_counted = False
             for subject, info in subjects.items():
                 if "ELECTIVE" in section.upper():
                     if not elective_counted:
                         total_hours += info.get("total_hours_per_week", 0)
+                        subjects_hours.append((subject, info.get("total_hours_per_week", 0)))  # Store subject hours
                         elective_counted = True
                 else:
                     total_hours += info.get("total_hours_per_week", 0)
-        TOTALHR[course] = total_hours
+                    subjects_hours.append((subject, info.get("total_hours_per_week", 0)))  # Store subject hours
+
+        TOTALHR[course] = (total_hours, subjects_hours)  # Store total hours and subject hours
 
     # Sort the TOTALHR dictionary by total hours in descending order
-    sorted_courses = dict(sorted(TOTALHR.items(), key=lambda item: item[1], reverse=True))
+    sorted_courses = dict(sorted(TOTALHR.items(), key=lambda item: item[1][0], reverse=True))
+    
+
+    # Now sort subjects within each course by their hours in descending order
+    for course, (total_hours, subjects_hours) in sorted_courses.items():
+        # Sort subjects by their hours
+        sorted_subjects = sorted(subjects_hours, key=lambda x: x[1], reverse=True)
+        sorted_courses[course] = (total_hours, sorted_subjects)  # Update with sorted subjects
+
+    # sorted_courses now contains total hours and sorted subject hours
+    # pprint.pprint(sorted_courses)
+
 
     # If you want to keep the original courses in sorted order, you can update or create a new dictionary
     courses = {course: courses[course] for course in sorted_courses.keys()}
@@ -173,16 +180,13 @@ if courses is not None:
     n_m=[x for x,j in courses.items() if"NOT MORNING" in j ]
 
     m=list(set(courses.keys())-set(n_m))
-   # Step 2: Retrieve subjects from both categories for those classes
-    # List comprehension to check if both "ELECTIVE-I" and "ELECTIVE-II" exist and are not empty
+
     ele = [key for key in courses if "ELECTIVE-I" in courses[key] or "ELECTIVE-II" in courses[key] 
         and courses[key]["ELECTIVE-I"]  # Check if "ELECTIVE-I" is not empty
         and courses[key]["ELECTIVE-II"]]  # Check if "ELECTIVE-II" is not empty
 
 
-    # Step 3: Extract elective subjects if the key exists
-    # Create a set of unique elective subjects from both "ELECTIVE-I" and "ELECTIVE-II"
-    # Create a set of unique elective subjects from both "ELECTIVE-I" and "ELECTIVE-II"
+   
     ele_sub = set()
 
     for key in ele:  # Iterate over identified classes
@@ -205,20 +209,14 @@ if courses is not None:
                     cc[class_name][subject_name] = details["subject_code"]
 
 
-# print(ele_sub)
-
-
-
-    # Print sorted results in table format
-    # print_courses_table(courses, shortsub)
 
 else:
     print("No courses found or file upload failed.")
 
 
-list1 = ["Dr KIRUBANAND V B", "Dr FABIOLA HAZEL POHRMEN", "Dr CYNTHIA"]
-list2 = ["Dr SARAVANAKUMAR K", "Dr SANGEETHA GOVINDA", "Dr SMERA"]
-list3 = ["Dr RAMAMURTHY B", "Dr AMRUTHA"]
+list1 = ["Dr KIRUBANAND V B","Dr VIJAY ARPUTHARAJ J"]
+list2 = ["Dr BEAULAH SOUNDARABAI P" , "Dr NISMON RIO R"]
+list3 = ["Dr MOHANA PRIYA T","Dr AMURTHA K"]
 
 # Converting all elements to upper case
 # print(list1)
@@ -226,9 +224,13 @@ list1 = [name.upper() for name in list1]
 list2 = [name.upper() for name in list2]
 list3 = [name.upper() for name in list3]
 import pprint
+
+mdc_teacher=["Dr SANGEETHA GOVINDA","Dr SARAVANAN K N","Dr SMERA","Dr HUBERT SHANTHAN","Dr VINEETHA KR"]
+mdc_teacher = [name.upper() for name in mdc_teacher]
 # print(ele)
 # print(ele_sub)
 # pprint.pprint(courses)
 
 
 
+print_courses_table(courses, shortsub)

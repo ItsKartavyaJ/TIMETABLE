@@ -9,7 +9,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from data import courses, short_teachers, shortsub,CLASSES,n_m,m,ele,ele_sub,list1,list2,list3,CLASSES_t,cc
+from data import courses, short_teachers, shortsub,CLASSES,n_m,m,ele,ele_sub,list1,list2,list3,cc,mdc_teacher
 
 
 
@@ -17,7 +17,6 @@ class TimetableGenerator:
     def __init__(self, courses, num_days=6, num_hours=9):
         self.courses = courses
         self.classes = list(CLASSES.keys())
-        self.ct=list(CLASSES_t.keys())
         self.num_days = num_days
         self.num_hours = num_hours
         self.notmorningteachers=[]
@@ -26,18 +25,24 @@ class TimetableGenerator:
             "MCA Lab": {day: {hour: [] for hour in range(num_hours)} for day in range(num_days)},
             "BSc Lab": {day: {hour: [] for hour in range(num_hours)} for day in range(num_days)}
         }
+        self.mdcteachers=mdc_teacher
         for h in range(self.num_hours):
             self.lab_timetables["MCA Lab"][5][h].append(("NULL", "NULL"))
+        for h in range(self.num_hours):
+            self.lab_timetables["BSc Lab"][5][h].append(("NULL", "NULL"))
         self.teacher_schedule = {day: {hour: set() for hour in range(num_hours)} for day in range(num_days)}  # Initialize teacher_schedule
         self.labs_assigned_per_hour = {day: {hour: 0 for hour in range(self.num_hours)} for day in range(self.num_days)}
         self.lab_teachers = {class_name: {subject: [] for category in categories.values() for subject in category.keys()}
-                for class_name, categories in courses.items()}        
-        self.timetable = None  # Initialize timetable as None
+                for class_name, categories in courses.items()}
+        self.lcaassigned={c: {d: False for d in range(num_days)} for c in self.classes}
+        self.catig=["LCA","LCA1", "ELECTIVE-I",  "language","HED", "MDC","ELECTIVE-II","act","MATHS","LAST"]
+        self.timetable = None  
     def generate_timetable(self):
         
         
         # Initialize timetable structure
         timetable = self.initialize_timetable()
+        self.blockteachersformdc()
         # pprint.pprint(timetable)
         allocated_subjects, theory_hours_assigned, lab_assigned_per_day, teacher_schedule = self.initialize_tracking_structures()
         self.blockteachers(self.notmorningteachers)
@@ -46,55 +51,50 @@ class TimetableGenerator:
         blocklib=None
         temp=self.find_free_slots_closest_to_six(timetable)
         for i,j in temp.items():
+            # NO MEET IN SAT
             if i==5:
                 continue
             if 5 in j:
                 blocklib=i
         self.pre_assign_extra_subjects(timetable,blocklib)
-        
-       
-      
-
-        
          # Assign LCA subjects to the first two hours of the day
+        self.assign_lca1_and_lab_hours(timetable, allocated_subjects, lab_assigned_per_day) 
         self.assign_lca_and_lab_hours(timetable, allocated_subjects, lab_assigned_per_day)
         
-  
-           #  # Assign all elective subjects at the same time for both sections A and B
         
         
+        #    #  # Assign all elective subjects at the same time for both sections A and B
         self.assign_elective_lab(timetable, allocated_subjects, lab_assigned_per_day, teacher_schedule)       
         self.assign_elective_hours(timetable, allocated_subjects, teacher_schedule)
         
-        self.assign_lab_hours_multiple_electives(timetable, allocated_subjects, lab_assigned_per_day, teacher_schedule, "5CME")
-        self.assign_elective_hours_single_section(timetable, allocated_subjects, teacher_schedule, "5CME")
+        self.assign_lab_hours_multiple_electives(timetable, allocated_subjects, lab_assigned_per_day, teacher_schedule, "6CME")
+        self.assign_elective_hours_single_section(timetable, allocated_subjects, teacher_schedule, "6CME")
 
         # Assign lab hours and theory hours
-  
         self.assign_lab_hours(timetable, allocated_subjects, lab_assigned_per_day, teacher_schedule)
         self.assign_theory_hours(timetable, allocated_subjects, theory_hours_assigned, teacher_schedule)
+       
+        
         
         self.assign_elective_teacher(timetable)
         self.assign_teachers_to_all_labs(timetable)  
         
-           
-        
         self.print_teacher_hr(self.calculate_teacher_hours())
-      
-        
-        
-        self.cross_verify_timetable_with_courses(timetable)
-        
-        # pprint.pprint(self.lab_teachers)
-        
+        # pprint.pprint(self.activity_teach())
+        self.assign_maths_hours(timetable, allocated_subjects, theory_hours_assigned, teacher_schedule)
        
         
-        
+        self.cross_verify_timetable_with_courses(timetable)
         self.timetable = timetable
         
         # pprint.pprint(timetable)
 
         return timetable
+    
+    
+
+                      
+            
     
     def blockteachers(self,notmorningteachers):
         for i in notmorningteachers:
@@ -144,10 +144,106 @@ class TimetableGenerator:
 
     
 
-    
-   
+        
+    def assign_lca1_and_lab_hours(self, timetable, allocated_subjects, lab_assigned_per_day):
+        for class_name in self.classes:
+            if 'LCA1' in self.courses[class_name]:
+                lca_subjects = self.courses[class_name]['LCA1']
+                for subject_name, subject_info in lca_subjects.items():
+                    lab_hours = subject_info["lab_hours"]
+                    teachers_for_subject = subject_info["teacher_incharge"]
+                    assigned_lab_hours = 0
 
-    
+                    # Assign lab hours first
+                    for day in range(self.num_days):
+                        if self.lcaassigned[class_name][day]:  # Only assign lab if not already assigned
+                            continue
+                        if assigned_lab_hours >= lab_hours:
+                            break
+
+                        # Determine the hours for labs based on the day
+                        f, s = (2, 3) if day == 5 else (3, 4)  # Assign to periods 2 & 3 on day 5, and 3 & 4 on other days
+
+                        # Only proceed if the lab isn't already assigned for the class
+                        if not lab_assigned_per_day[day][class_name]:
+                            if (len(timetable[day][class_name][f]) == 0 and 
+                                len(timetable[day][class_name][s]) == 0 and 
+                                self.labs_assigned_per_hour[day][f] <= 1):  # Ensure less than 2 labs are assigned at that hour
+
+                                # Check teacher allocation and availability for the chosen hours
+                                if (all(teacher not in self.teacher_schedule[day][f] for teacher in teachers_for_subject) and
+                                    self.is_teacher_allocated_in_first_two_hours(teachers_for_subject, day, 0)):
+
+                                    lab_venue = self.get_available_lab(day, f)  # Get the available lab for the current day and hour
+                                    if lab_venue and self.is_lab_available(lab_venue, day, f):  # Check if the lab is available at that time
+                                        # Assign the lab
+                                        self.assign_lab(
+                                            timetable, day, class_name, f, subject_name, teachers_for_subject, 
+                                            lab_venue, allocated_subjects, self.teacher_schedule
+                                        )
+
+                                        # Mark the lab as assigned for this day and class
+                                        lab_assigned_per_day[day][class_name] = True
+                                        self.labs_assigned_per_hour[day][f] += 1
+                                        self.labs_assigned_per_hour[day][s] += 1  # Increment labs count for that hour
+                                        assigned_lab_hours += 1
+                                        self.lcaassigned[class_name][day] = True
+                                        break
+
+                    # Now, handle the normal LCA hours (theory)
+                    required_hours = subject_info["normal_hours"]  # Required LCA hours
+                    assigned_lca_hours = 0
+
+                    # Assign LCA hours incrementally
+                    for day in range(self.num_days):
+                        if self.lcaassigned[class_name][day]:
+                            continue
+                        if assigned_lca_hours >= required_hours:
+                            break  # Stop if all required LCA hours have been assigned
+
+                        # Check if we can assign two consecutive hours in the first two hours of the day
+                        for hour in range(3, 5):  # Only check hours 3 and 4
+                            teachers_for_lca = subject_info["teacher_incharge"]
+
+                            # Ensure both hours are free, teachers are available, and the lab is not already assigned at those times
+                            can_assign = (len(timetable[day][class_name][hour]) == 0 and 
+                                        len(timetable[day][class_name][hour + 1]) == 0 and
+                                        all(teacher not in self.teacher_schedule[day][hour] and 
+                                            teacher not in self.teacher_schedule[day][hour + 1]
+                                            for teacher in teachers_for_lca) )  # Ensure the lab is free for next hour
+
+                            # Check if teachers are allocated in the first two hours
+                            p = (self.is_teacher_allocated_in_first_two_hours(teachers_for_lca, day, hour) and
+                                self.is_teacher_allocated_in_first_two_hours(teachers_for_lca, day, hour + 1))
+
+                            if can_assign and p:
+                                lab_venue = self.get_available_lab(day, hour)  # Check lab availability for theory hours
+                                if lab_venue and self.is_lab_available(lab_venue, day, hour+1):
+                                    # Assign the first hour
+                                    self.lcaassigned[class_name][day] = True
+                                    for teacher in teachers_for_lca:
+                                        self.teacher_schedule[day][hour].add(teacher)  # Block the teacher's schedule
+                                    timetable[day][class_name][hour].append((subject_name, teachers_for_subject, lab_venue,""))  # Store all teachers and lab venue
+                                    self.lab_timetables[lab_venue][day][hour ].append((subject_name, teachers_for_subject))
+                                    # self.labs_assigned_per_hour[day][hour] += 1  # Mark the lab as booked
+                                    assigned_lca_hours += 1
+
+                                    # If more hours are required, assign the next consecutive hour
+                                    if assigned_lca_hours < required_hours and assigned_lca_hours + 1 <= required_hours:
+                                        timetable[day][class_name][hour+1].append((subject_name, teachers_for_subject, lab_venue,""))  # Store all teachers and lab venue
+                                        self.lab_timetables[lab_venue][day][hour+1].append((subject_name, teachers_for_subject))
+                                        for teacher in teachers_for_lca:
+                                            self.teacher_schedule[day][hour + 1].add(teacher)  # Block the teacher's schedule
+                                        # self.labs_assigned_per_hour[day][hour + 1] += 1  # Mark the lab as booked for next hour
+                                        assigned_lca_hours += 1
+                                    self.lcaassigned[class_name][day] = True
+                                    break  # Move to the next day after assigning hours
+
+                        # If the LCA subject has been assigned for all required hours, stop assigning
+                        if assigned_lca_hours >= required_hours:
+                            break
+
+
     def assign_lca_and_lab_hours(self, timetable, allocated_subjects, lab_assigned_per_day):
         for class_name in self.classes:
             if 'LCA' in self.courses[class_name]:
@@ -157,25 +253,31 @@ class TimetableGenerator:
                     teachers_for_subject = subject_info["teacher_incharge"]
                     assigned_lab_hours = 0
 
-                    for day in range(self.num_days):
+                    for day in range(self.num_days-1, -1, -1):
+                        if self.lcaassigned[class_name][day]:
+                            continue
                         if assigned_lab_hours >= lab_hours:
                             break
+                        if day == 5:
+                            f, s = 2, 3
+                        else:
+                            f, s = 0, 1
 
                         if not lab_assigned_per_day[day][class_name]:
-                            if (len(timetable[day][class_name][0]) == 0 and len(timetable[day][class_name][1]) == 0 and
-                                    self.labs_assigned_per_hour[day][0] ==0):  # Check if less than 2 labs assigned
+                            if (len(timetable[day][class_name][f]) == 0 and len(timetable[day][class_name][s]) == 0 and
+                                    self.labs_assigned_per_hour[day][f] <= 1):  # Check if less than 2 labs assigned
 
                                 p = self.is_teacher_allocated_in_first_two_hours(teachers_for_subject, day, 0)
-                                if all(teacher not in self.teacher_schedule[day][0] for teacher in teachers_for_subject) and p:
+                                if all(teacher not in self.teacher_schedule[day][f] for teacher in teachers_for_subject) and p:
                                     lab_venue = self.get_available_lab(day, 0)
-                                    if lab_venue and self.is_lab_available(lab_venue, day, 0):
-                                        self.assign_lab(timetable, day, class_name, 0, subject_name, teachers_for_subject, lab_venue, allocated_subjects, self.teacher_schedule)
-                                        
+                                    if lab_venue and self.is_lab_available(lab_venue, day, f):
+                                        self.assign_lab(timetable, day, class_name, f, subject_name, teachers_for_subject, lab_venue, allocated_subjects, self.teacher_schedule)
+
                                         lab_assigned_per_day[day][class_name] = True
-                                        self.labs_assigned_per_hour[day][0] += 1
-                                        self.labs_assigned_per_hour[day][1] += 1
-                                                                                    # Increment labs count for that hour
+                                        self.labs_assigned_per_hour[day][f] += 1
+                                        self.labs_assigned_per_hour[day][s] += 1  # Increment labs count for that hour
                                         assigned_lab_hours += 1
+                                        self.lcaassigned[class_name][day] = True
                                         break
 
                     # Now, handle the normal LCA hours
@@ -184,25 +286,35 @@ class TimetableGenerator:
 
                     # Assign LCA hours incrementally
                     for day in range(self.num_days):
+                        if self.lcaassigned[class_name][day]:
+                            continue
                         if assigned_lca_hours >= required_hours:
                             break  # Stop if all required LCA hours have been assigned
+                        if day == 5:
+                            r = range(2, 4)
+                        else:
+                            r = range(2)
 
                         # Check if we can assign two consecutive hours in the first two hours of the day
-                        for hour in range(2):  # Only check hours 0 and 1
+                        for hour in r:  # Only check hours 0 and 1
                             teachers_for_lca = subject_info["teacher_incharge"]
+
                             # Ensure both hours are free and teachers are available
                             can_assign = (len(timetable[day][class_name][hour]) == 0 and 
-                                        len(timetable[day][class_name][hour + 1]) == 0 and
-                                        all(teacher not in self.teacher_schedule[day][hour] and teacher not in self.teacher_schedule[day][hour + 1]
-                                            for teacher in teachers_for_lca))
-                            
-                            p=self.is_teacher_allocated_in_first_two_hours(teachers_for_lca,day,hour)  and self.is_teacher_allocated_in_first_two_hours(teachers_for_lca,day,hour)
+                                          len(timetable[day][class_name][hour + 1]) == 0 and
+                                          all(teacher not in self.teacher_schedule[day][hour] and 
+                                              teacher not in self.teacher_schedule[day][hour + 1]
+                                              for teacher in teachers_for_lca))
+
+                            p = self.is_teacher_allocated_in_first_two_hours(teachers_for_lca, day, hour) and \
+                                self.is_teacher_allocated_in_first_two_hours(teachers_for_lca, day, hour)
 
                             # Try to assign hours one by one to meet the required total
                             if can_assign:
                                 if assigned_lca_hours + 1 <= required_hours:
                                     # Assign the first hour
                                     timetable[day][class_name][hour].append((subject_name, teachers_for_lca))
+                                    self.lcaassigned[class_name][day] = True
                                     for teacher in teachers_for_lca:
                                         self.teacher_schedule[day][hour].add(teacher)  # Block the teacher's schedule
                                     assigned_lca_hours += 1  # Increment the assigned LCA hours
@@ -210,6 +322,7 @@ class TimetableGenerator:
                                 if assigned_lca_hours < required_hours and assigned_lca_hours + 1 <= required_hours:
                                     # Assign the second hour
                                     timetable[day][class_name][hour + 1].append((subject_name, teachers_for_lca))
+                                    self.lcaassigned[class_name][day] = True
                                     for teacher in teachers_for_lca:
                                         self.teacher_schedule[day][hour + 1].add(teacher)  # Block the teacher's schedule
                                     assigned_lca_hours += 1  # Increment again
@@ -240,14 +353,16 @@ class TimetableGenerator:
         max_teaching_hours = 18
         sagaya_hours_limit = 12
         manjunatha_hours_limit = 12
-        max_teachers = 5  
+        max_teachers = 5
+        
 
         # Iterate over each lab session
         for (class_name, subject_name), lab_time_slots in lab_hours.items():
+          
             # Skip if the subject matches the elective condition
             if (class_name == ele[1] and subject_name in ele_sub[1]) or\
                 (class_name == ele[0] and subject_name in ele_sub[0]) or \
-                (class_name=="5CME" and subject_name in ["WEB TECHNOLOGY","GRAPHICS AND ANIMATION"]):
+                (class_name=="5CME" and subject_name in ["WEB TECHNOLOGY"]):
                 # Prepare the lab time slots based on the elective class
                 if class_name == ele[1]:
                     lab_time_slots_set = set(lab_time_slots[0:2])  # Assume elective 1 has slots 2 to 4
@@ -259,6 +374,7 @@ class TimetableGenerator:
                     lab_time_slots_set = set(lab_time_slots[0:2])  # Assume elective 1 has slots 2 to 4
                     lab_time_slots = lab_time_slots[0:2]
                     
+                    
                 
 
                 # List to keep track of allocated teachers for this lab
@@ -266,6 +382,7 @@ class TimetableGenerator:
 
                 # Check existing teachers assigned to the lab session
                 for (day, hour) in lab_time_slots:
+                    # print(class_name,subject_name,day,hour)
                     if len(timetable[day][class_name][hour]) > 0:
                         if class_name == ele[1]:
                             allocated_teachers.extend(timetable[day][class_name][hour][0][1])  # Teachers at index 1 for elective 1
@@ -292,24 +409,14 @@ class TimetableGenerator:
 
                     # Check if specific teachers have exceeded their hourly limits
                     if (teacher.lower() == "dr sagaya aurelia p".lower() and teacher_hours.get(teacher, 0) >= sagaya_hours_limit) or \
-                    (teacher.lower() == "dr manjunatha hiremath".lower() and teacher_hours.get(teacher, 0) >= manjunatha_hours_limit):
+                    (teacher.lower() == "dr manjunatha hiremath".lower() and teacher_hours.get(teacher, 0) >= manjunatha_hours_limit)or\
+                       (teacher.lower() == "Dr ASHOK IMMANUEL".lower() and teacher_hours.get(teacher, 0) >= 6) :
                         continue
 
                     # Check if the lab hours are a subset of the teacher's free hours
                     if lab_time_slots_set.issubset(free_slots_set):
                         current_hours = teacher_hours.get(teacher, 0)
-                        first_two_hours_allocated = any(teacher in self.teacher_schedule[day][h] for h in range(0,2))
-                        last_two_hours_allocated = any(teacher in self.teacher_schedule[day][h] for h in range(7, 9))
-                        lab_last2=any(h in range(7, 9) for _, h in lab_time_slots)
-                        lab_first2=any(h in range(0,2) for _, h in lab_time_slots)
-
-                        # If the teacher is assigned to the first two hours, do not assign to the last two hours and vice versa
-                        if first_two_hours_allocated and lab_last2:
-                            
-                            continue  # Skip assigning teacher if there's a conflict with last two hours
-                        if last_two_hours_allocated and lab_first2:
-                            continue  # Skip assigning teacher if there's a conflict with first two hours
-
+                       
 
                         # Check if adding the current lab session will exceed max teaching hours
                         if current_hours + 2 <= max_teaching_hours:
@@ -332,6 +439,18 @@ class TimetableGenerator:
                     
                 # Block the teacher's schedule for the lab time slots
                 for (day, hour) in lab_time_slots:
+                    first_two_hours_allocated = any(teacher in self.teacher_schedule[day][h] for h in range(0,2))
+                    first_two_hours_allocated=False if teacher in self.notmorningteachers else True
+                    last_two_hours_allocated = any(teacher in self.teacher_schedule[day][h] for h in range(7, 9))
+                    lab_last2=any(h in range(7, 9) for _, h in lab_time_slots)
+                    lab_first2=any(h in range(0,2) for _, h in lab_time_slots)
+
+                    # If the teacher is assigned to the first two hours, do not assign to the last two hours and vice versa
+                    if first_two_hours_allocated and lab_last2:
+                        continue  # Skip assigning teacher if there's a conflict with last two hours
+                    if last_two_hours_allocated and lab_first2:
+                        continue  # Skip assigning teacher if there's a conflict with first two hours
+
                     if hour <= 8:  # Ensure valid hours
                         if allocated_teachers:  # Only update if we have allocated teachers
                             # Update the timetable with the allocated teachers
@@ -352,6 +471,8 @@ class TimetableGenerator:
                 # If fewer than 6 teachers are allocated, notify
                 if len(allocated_teachers) < max_teachers:
                     print(f"Only {len(allocated_teachers)} teachers allocated for {class_name} - {subject_name} lab. Need more teachers.")
+                # else:
+                #      print(f" {allocated_teachers} teachers allocated for {class_name} - {subject_name} ")
 
     def assign_teachers_to_all_labs(self, timetable):
         """
@@ -373,8 +494,8 @@ class TimetableGenerator:
                     lab_time_slots_set = set(lab_time_slots[0:2])
                     lab_time_slots=lab_time_slots[0:2]
                 else:
-                    lab_time_slots_set = set(lab_time_slots[0:2])
-                    lab_time_slots=lab_time_slots[0:2]
+                    lab_time_slots_set = set(lab_time_slots[2:5])
+                    lab_time_slots=lab_time_slots[2:5]
 
                 # List to track allocated teachers for this lab session
                 allocated_teachers = []
@@ -397,8 +518,9 @@ class TimetableGenerator:
                     free_slots_set = set(free_slots)
 
                     # Check teacher-specific hour limits (e.g., max 12 hours for specific teachers)
-                    if ((teacher.lower() == "dr sagaya aurelia p".lower() and teacher_hours.get(teacher, 0) >= 12) or 
-                        (teacher.lower() == "dr manjunatha hiremath".lower() and teacher_hours.get(teacher, 0) >= 12)):
+                    if ((teacher.lower() == "dr sagaya aurelia p".lower() and teacher_hours.get(teacher, 0) >= 12) or
+                        (teacher.lower() == "dr manjunatha hiremath".lower() and teacher_hours.get(teacher, 0) >= 12)or
+                    (teacher.lower() == "Dr ASHOK IMMANUEL".lower() and teacher_hours.get(teacher, 0) >= 6)) :
                         continue  # Skip this teacher if they've reached their limit
 
                     # Ensure the teacher has enough free slots for the lab
@@ -409,6 +531,7 @@ class TimetableGenerator:
                         if current_hours + 2 <= 18:
                             # Add checks for the first 2 and last 2 hours condition
                             first_two_hours_allocated = any(teacher in self.teacher_schedule[day][h] for h in range(0,2))
+                            first_two_hours_allocated=False if teacher in self.notmorningteachers else True
                             last_two_hours_allocated = any(teacher in self.teacher_schedule[day][h] for h in range(7, 9))
                             lab_last2=any(h in range(7, 9) for _, h in lab_time_slots)
                             lab_first2=any(h in range(0,2) for _, h in lab_time_slots)
@@ -459,7 +582,8 @@ class TimetableGenerator:
                             # Block the teacher's schedule for the allocated time slots
                             for teacher in allocated_teachers:
                                 self.teacher_schedule[day][hour].add(teacher)  # Block the teacher's time
-                if len(allocated_teachers) <= 4:
+                if len(allocated_teachers) < 5:
+                    # self.assign_teachers_to_all_labs(timetable)
                     print(f"Only {len(allocated_teachers)} teachers could be allocated for {class_name} - {subject_name} lab.")
         
     def assign_teachers_to_unassigned_subjects(self, timetable, allocated_teachers,class_name, subject_name, lab_time_slots):
@@ -481,7 +605,8 @@ class TimetableGenerator:
 
                 # Check teacher-specific hour limits
                 if ((teacher.lower() == "dr sagaya aurelia p".lower() and teacher_hours.get(teacher, 0) >= 12) or 
-                    (teacher.lower() == "dr manjunatha hiremath".lower() and teacher_hours.get(teacher, 0) >= 12)):
+                    (teacher.lower() == "dr manjunatha hiremath".lower() and teacher_hours.get(teacher, 0) >= 12) or 
+                          (teacher.lower() == "Dr ASHOK IMMANUEL".lower() and teacher_hours.get(teacher, 0) >= 6)) :
                     continue  # Skip if the teacher has reached their limit
 
                 # Ensure the teacher has enough free slots for the lab
@@ -559,7 +684,7 @@ class TimetableGenerator:
             if first_hour_allocated or second_hour_allocated:
                 return False  # At least one teacher is allocated in the first two hours
 
-        return True  # No teachers are allocated in the first two hours, or hour is not last/second last
+        return True if teacher_names not in self.notmorningteachers else False  # No teachers are allocated in the first two hours, or hour is not last/second 
 
 
     
@@ -651,7 +776,7 @@ class TimetableGenerator:
                         if teacher not in busy_teachers:
                             teacher_free_hours[teacher].append((day, hour))
 
-      
+        # f = random.choice([ False,True])
         sorted_teacher_free_hours = dict(
             sorted(teacher_free_hours.items(), key=lambda item: len(item[1]), reverse=True)
         )
@@ -700,7 +825,7 @@ class TimetableGenerator:
     def print_teacher_hr(self,teacherhr):
         i=1
         for x,y in teacherhr.items():
-            print(f"{i} {x} :{y} ")
+            print(f"{i}) {x} :{y} ")
             i=i+1
            
             
@@ -728,6 +853,20 @@ class TimetableGenerator:
                             teacher_hours[teacher] += 1
                         else:
                             teacher_hours[teacher] = 1
+        
+        for day in range(self.num_days):  # Assuming num_days is defined
+            for hour in range(0,2):  # Assuming num_hours is defined
+                # Check which teachers are scheduled for this hour
+                for teacher in self.teacher_schedule[day][hour]:
+                    teacher = teacher.strip()  # Clean any extra whitespace
+
+                    # Increment the count of teaching hours for this teacher
+                    if teacher.lower().startswith("dr"):  # Check for title if necessary
+                        if teacher in self.notmorningteachers:
+                            if teacher in teacher_hours:
+                                teacher_hours[teacher] -= 1
+        
+                
         sorted_dict = dict(sorted(teacher_hours.items(), key=lambda item: item[1], reverse=True))
         return sorted_dict
 
@@ -767,7 +906,7 @@ class TimetableGenerator:
     def assign_lib(self,timetable,class_name,d):
         # print(d)
         # if "LIBRARY" in courses[class_name]:
-        if  not timetable[1][class_name][5]:
+        if  not timetable[d][class_name][5]:
             timetable[d][class_name][5].append(("Library",["lib"]))
             
     def acc(self,timetable,class_name):
@@ -839,10 +978,20 @@ class TimetableGenerator:
     def assign_mdc(self, timetable, class_name):
         """Pre-assign 'MDC' to specific hours if the class has it."""
         if 'MDC' in self.courses[class_name]:  # Check if "MDC" exists for this class
-            for hour in range(3, 5):  # 3rd and 4th hours on day 1
-                timetable[1][class_name][hour].append(("MDC", []))
-            # Pre-assign "MDC" to the 2nd hour on day 4
-            timetable[3][class_name][3].append(("MDC", []))  # 2nd hour on day 4
+            for day in [1, 3]:
+                # On day 1, assign hours 3 and 4; on day 3, assign hour 3
+                hours = range(3, 5) if day == 1 else range(3, 4)
+                for hour in hours:
+                    timetable[day][class_name][hour].append(("MDC", []))
+
+   
+    def blockteachersformdc(self):
+        for teacher in self.mdcteachers:
+            for day in [1, 3]:
+                # On day 1, block hours 3 and 4; on day 3, block hour 3
+                hours = range(3, 5) if day == 1 else range(3, 4)
+                for hour in hours:
+                    self.teacher_schedule[day][hour].add(teacher)
 
     def assign_lunch(self, timetable, class_name):
         """Assign lunch based on the 'NOT MORNING' key."""
@@ -898,8 +1047,8 @@ class TimetableGenerator:
             # timetable[5][class_name][0].append(("BLOCKED", []))
 
             # Block hour 5 on day 5 unless the class is "5BCA A" or "5BCA B"
-            if class_name not in ["5BCA A", "5BCA B"]:
-                timetable[5][class_name][6].append(("BLOCKED", []))
+            # if class_name not in ["5BCA A", "5BCA B"]:
+            #     timetable[5][class_name][6].append(("BLOCKED", []))
 
             # Block hours from the 6th hour onward for all days
             for hour in range(6, len(timetable[0][class_name])):
@@ -912,93 +1061,7 @@ class TimetableGenerator:
 
 
 
-    def assign_lca_lab_hours(self, timetable, allocated_subjects, lab_assigned_per_day):
-        """
-        Assigns lab hours to the timetable based on the number of hours mentioned for each subject.
-
-        Args:
-        timetable (list): The timetable structure.
-        allocated_subjects (set): The set of subjects already allocated in the timetable.
-        lab_assigned_per_day (list): A boolean list that tracks whether a lab has been assigned for each class per day.
-        """
-        for class_name in self.classes:
-            if 'LCA' in self.courses[class_name]:  # Check if LCA exists for this class
-                lca_subjects = self.courses[class_name]['LCA']
-
-                for subject_name, subject_info in lca_subjects.items():
-                    lab_hours = subject_info["lab_hours"]  # Total required lab hours
-                    teachers_for_subject = subject_info["teacher_incharge"]
-                    assigned_lab_hours = 0
-
-                    for day in range(self.num_days):
-                        if assigned_lab_hours >= lab_hours:
-                            break  # Stop if we've assigned all required lab hours
-
-                        # Ensure that the lab hasn't been assigned already and the first two hours are free
-                        if not lab_assigned_per_day[day][class_name]:
-                            if len(timetable[day][class_name][0]) == 0 and len(timetable[day][class_name][1]) == 0:
-                                # Check if teachers are available
-                                if (self.is_teacher_allocated_in_first_two_hours(teachers_for_subject, day, 0) and
-                                    all(teacher not in self.teacher_schedule[day][0] for teacher in teachers_for_subject)):
-
-                                    lab_venue = self.get_available_lab(day, 0)  # Get an available lab venue
-                                    if lab_venue and self.is_lab_available(lab_venue, day, 0):  # Check if the lab is available
-                                        # Assign the lab to the timetable and block the teacher's schedule
-                                        self.assign_lab(timetable, day, class_name, 0, subject_name, teachers_for_subject, lab_venue, allocated_subjects, self.teacher_schedule)
-                                        lab_assigned_per_day[day][class_name] = True
-                                        assigned_lab_hours += 2  # Increment assigned lab hours by 2
-                                        break  # Move to the next subject once lab hours are assigned
-
-    def assign_lca_hours(self, timetable, allocated_subjects):
-        """
-        Assigns LCA (normal) hours to the timetable based on the number of hours mentioned for each subject.
-
-        Args:
-        timetable (list): The timetable structure.
-        allocated_subjects (set): The set of subjects already allocated in the timetable.
-        """
-        for class_name in self.classes:
-            if 'LCA' in self.courses[class_name]:  # Check if LCA exists for this class
-                lca_subjects = self.courses[class_name]['LCA']
-
-                for subject_name, subject_info in lca_subjects.items():
-                    required_hours = subject_info["normal_hours"]  # Required LCA hours
-                    assigned_lca_hours = 0
-
-                    for day in range(self.num_days):
-                        if assigned_lca_hours >= required_hours:
-                            break  # Stop if all required LCA hours have been assigned
-
-                        # Check if we can assign two consecutive hours in the first two hours of the day
-                        for hour in range(2):  # Only check hours 0 and 1
-                            teachers_for_lca = subject_info["teacher_incharge"]
-                            can_assign = (len(timetable[day][class_name][hour]) == 0 and 
-                                        len(timetable[day][class_name][hour + 1]) == 0 and
-                                        all(teacher not in self.teacher_schedule[day][hour] and 
-                                            teacher not in self.teacher_schedule[day][hour + 1]
-                                            for teacher in teachers_for_lca))
-
-                            if can_assign:
-                                if assigned_lca_hours + 1 <= required_hours:
-                                    # Assign the first hour
-                                    timetable[day][class_name][hour].append((subject_name, teachers_for_lca))
-                                    for teacher in teachers_for_lca:
-                                        self.teacher_schedule[day][hour].add(teacher)  # Block the teacher's schedule
-                                    assigned_lca_hours += 1
-
-                                if assigned_lca_hours < required_hours and assigned_lca_hours + 1 <= required_hours:
-                                    # Assign the second hour
-                                    timetable[day][class_name][hour + 1].append((subject_name, teachers_for_lca))
-                                    for teacher in teachers_for_lca:
-                                        self.teacher_schedule[day][hour + 1].add(teacher)  # Block the teacher's schedule
-                                    assigned_lca_hours += 1
-
-                                break  # Move to the next day after assigning hours
-
-                        # Stop if all LCA hours are assigned
-                        if assigned_lca_hours >= required_hours:
-                            break
-
+    
 
     def assign_elective_subject(self, timetable, day, class_name, hour, subject_name, teachers_for_subject, teacher_schedule):
         # Check if the subject is already assigned for this hour
@@ -1102,7 +1165,7 @@ class TimetableGenerator:
                                     break
     def assign_elective_lab(self, timetable, allocated_subjects, lab_assigned_per_day, teacher_schedule):
         for class_name, class_data in self.courses.items():
-            if class_name in ['5BCA A']:
+            if class_name in [ele[0]]:
                 for category, subjects in class_data.items():
                     if category == "ELECTIVE-I":
                         assigned_lab_hours_ga = 0
@@ -1126,7 +1189,7 @@ class TimetableGenerator:
                                     if assigned_lab_hours_ga < ga_lab_hours_needed and assigned_lab_hours_bi < bi_lab_hours_needed:
                                         
                                         # Check if the time slots are free in the timetable for both subjects
-                                        if len(timetable[day][class_name][hour]) == 0 and len(timetable[day][class_name][hour + 1]) == 0 and self.labs_assigned_per_hour[day][hour]==0:
+                                        if len(timetable[day][class_name][hour]) == 0 and len(timetable[day][class_name][hour + 1]) == 0 and self.labs_assigned_per_hour[day][hour]<=2 and self.labs_assigned_per_hour[day][hour+1]<=2 :
                                             
                                             # Check teacher availability for both subjects
                                             teachers_for_ga = subjects[subjects_to_assign[0]]["teacher_incharge"]
@@ -1149,37 +1212,37 @@ class TimetableGenerator:
                                                 if lab_venue_ga and self.is_lab_available(lab_venue_ga, day, hour) and \
                                                 lab_venue_bi and self.is_lab_available(lab_venue_bi, day, hour):
                                                     
-                                                    # Assign lab for 5BCA A - GA
+                                                    # Assign lab for 5BCA A 
                                                     self.assign_lab(timetable, day, class_name, hour, subjects_to_assign[0],
                                                                     teachers_for_ga, lab_venue_ga, allocated_subjects, teacher_schedule)
                                                     lab_assigned_per_day[day][class_name] = True
                                                     for teacher in teachers_for_ga:
                                                         self.teacher_schedule[day][hour].add(teacher)
 
-                                                    # Assign lab for 5BCA B - GA
-                                                    self.assign_lab(timetable, day, "5BCA B", hour, subjects_to_assign[0],
+                                                    # Assign lab for 5BCA B 
+                                                    self.assign_lab(timetable, day, ele[1], hour, subjects_to_assign[0],
                                                                     teachers_for_ga, lab_venue_ga, allocated_subjects, teacher_schedule)
-                                                    lab_assigned_per_day[day]["5BCA B"] = True
+                                                    lab_assigned_per_day[day][ele[1]] = True
                                                     for teacher in teachers_for_ga:
                                                         self.teacher_schedule[day][hour].add(teacher)
 
-                                                    # Assign lab for 5BCA A - BI (in a different venue if available)
+                                                    # Assign lab for 5BCA A 
                                                     self.assign_lab(timetable, day, class_name, hour , subjects_to_assign[1],
                                                                     teachers_for_bi, lab_venue_bi, allocated_subjects, teacher_schedule)
                                                     lab_assigned_per_day[day][class_name] = True
                                                     for teacher in teachers_for_bi:
                                                         self.teacher_schedule[day][hour + 1].add(teacher)
 
-                                                    # Assign lab for 5BCA B - BI
-                                                    self.assign_lab(timetable, day, "5BCA B", hour , subjects_to_assign[1],
+                                                    # Assign lab for 5BCA B 
+                                                    self.assign_lab(timetable, day, ele[1], hour , subjects_to_assign[1],
                                                                     teachers_for_bi, lab_venue_bi, allocated_subjects, teacher_schedule)
-                                                    lab_assigned_per_day[day]["5BCA B"] = True
+                                                    lab_assigned_per_day[day][ele[1]] = True
                                                     for teacher in teachers_for_bi:
                                                         self.teacher_schedule[day][hour + 1].add(teacher)
 
                                                     # Update assigned lab hours
-                                                    assigned_lab_hours_ga += 2  # Two hours for GA
-                                                    assigned_lab_hours_bi += 2  # Two hours for BI
+                                                    assigned_lab_hours_ga += 2  
+                                                    assigned_lab_hours_bi += 2  
                                                     self.labs_assigned_per_hour[day][hour]+=2
                                                     self.labs_assigned_per_hour[day][hour+1]+=2
                                                     
@@ -1296,7 +1359,7 @@ class TimetableGenerator:
                                 p2=self.is_teacher_allocated_in_first_two_hours(teachers_for_subject2,day,hour)
 
                                 # Check if the teachers are free for both subjects
-                                if   ava and p and p2 and self.labs_assigned_per_hour[day][hour]<=1 :  
+                                if   ava and p and p2 and self.labs_assigned_per_hour[day][hour]==0 and self.labs_assigned_per_hour[day][hour+1]==0 :  
                                     x=self.get_two_different_available_labs(day, hour)  # Assuming same lab for both subjects
                                     lab_venue1=x[0]
                                     lab_venue2=x[1]
@@ -1314,7 +1377,9 @@ class TimetableGenerator:
                                         lab_assigned_per_day[day][class_name] = True
                                         assigned_lab_hours1 += 2  # Increment for subject 1
                                         assigned_lab_hours2 += 2  # Increment for subject 2
-                                        self.labs_assigned_per_hour[day][hour]+=1
+                                        self.labs_assigned_per_hour[day][hour]+=3
+                                        self.labs_assigned_per_hour[day][hour+1]+=3
+                                        
                                         break  # Exit the loop to re-evaluate lab assignments
 
                     if assigned_lab_hours1 >= lab_hours1 and assigned_lab_hours2 >= lab_hours2:
@@ -1326,10 +1391,13 @@ class TimetableGenerator:
                 if len(timetable[day][class_name][hour]) == 0 and len(timetable[day][class_name][hour + 1]) == 0:
                     # Check for alternative conditions
                     lab_venue = self.get_available_lab(day, hour)
-                    if lab_venue and self.is_lab_available(lab_venue, day, hour):
+                    if lab_venue and self.is_lab_available(lab_venue, day, hour) and self.labs_assigned_per_hour[day][hour] <= 2 and self.labs_assigned_per_hour[day][hour+1]<=2 and not  lab_assigned_per_day[day][class_name]:
                         # Assign lab since primary conditions weren't met
                         self.assign_lab(timetable, day, class_name, hour, subject_name, teachers_for_subject, lab_venue, allocated_subjects, self.teacher_schedule)
                         lab_assigned_per_day[day][class_name] = True
+                        self.labs_assigned_per_hour[day][hour]+=1
+                        self.labs_assigned_per_hour[day][hour+1]+=1
+                        
                         assigned_lab_hours += 2  # Increment by the number of lab hours assigned
                         if assigned_lab_hours >= lab_hours:
                             break  # Exit loop after successful allocation
@@ -1344,7 +1412,7 @@ class TimetableGenerator:
     def assign_lab_hours(self, timetable, allocated_subjects, lab_assigned_per_day, teacher_schedule):
         for class_name, class_data in self.courses.items():
             for category, subjects in class_data.items():
-                if category not in ["LCA", "ELECTIVE-I", "HED", "MDC", "Elective-II", "act","LIBRARY"]:
+                if category not in self.catig:
                     for subject_name, subject_info in subjects.items():
                         
                         lab_hours = subject_info["lab_hours"]
@@ -1359,28 +1427,84 @@ class TimetableGenerator:
                                     if len(timetable[day][class_name][hour]) == 0 and len(timetable[day][class_name][hour + 1]) == 0:
                                         t = all(teacher not in self.teacher_schedule[day][hour] for teacher in teachers_for_subject)
                                         p = self.is_teacher_allocated_in_first_two_hours(teachers_for_subject, day, hour)
-                                        if t and p and self.labs_assigned_per_hour[day][hour] <= 1:
+                                        if t and p and self.labs_assigned_per_hour[day][hour] <= 1 and self.labs_assigned_per_hour[day][hour+1]<=1:
                                             lab_venue = self.get_available_lab(day, hour)
                                             if lab_venue and self.is_lab_available(lab_venue, day, hour):
                                                 self.assign_lab(timetable, day, class_name, hour, subject_name, teachers_for_subject, lab_venue, allocated_subjects, teacher_schedule)
                                                 lab_assigned_per_day[day][class_name] = True
                                                 assigned_lab_hours += 2
                                                 self.labs_assigned_per_hour[day][hour] += 1
+                                                self.labs_assigned_per_hour[day][hour+1]+=1
                                                 break
 
                                 # Attempt to allocate lab alternatively if not enough hours were assigned
                         if assigned_lab_hours <lab_hours:
-                            print(f"Allocating lab alternatively for subject: {subject_name}")  # Debugging output
+                            # print(f"Allocating lab alternatively for subject: {subject_name}")  # Debugging output
                             assigned_lab_hours = self.allocate_lab_alternatively(timetable, allocated_subjects, lab_assigned_per_day, teachers_for_subject, lab_hours-assigned_lab_hours, class_name, 0, subject_name)
                                         
                 
     
+    def assign_maths_hours(self, timetable, allocated_subjects, theory_hours_assigned, teacher_schedule):
+        for class_name, class_data in self.courses.items():
+            for category, subjects in class_data.items():
+                if category in ["MATHS"]:
+                    for subject_name, subject_info in subjects.items():
+                        normal_hours = subject_info["normal_hours"]
+                        teachers_for_subject = subject_info["teacher_incharge"]
+                       
+
+                        # Proceed only if normal_hours is greater than 0
+                        if normal_hours > 0:
+                            assigned_theory_hours = 0
+
+                            for day in range(self.num_days-1,-1,-1):
+                                # print(day)
+                                # print(assigned_theory_hours)
+                                if day == 2:  # Skip day 3
+                                    continue
+
+                                total_hours = theory_hours_assigned[day][class_name].get(subject_name, 0)
+
+                                # Check if the subject can be assigned more hours on this day
+                                if total_hours < 2 and subject_name not in allocated_subjects[day][class_name]:
+                                    for hour in range(self.num_hours):
+                                        # F=True if day==4 and  hour==5 else False
+
+                                        # If the hour is free and teachers are available
+                                        if len(timetable[day][class_name][hour]) == 0 :
+                                            is_teacher_free = any(teacher not in self.teacher_schedule[day][hour] for teacher in teachers_for_subject)
+                                            # timetable[day][class_name][hour].append(())
+                                            is_teacher_available = self.is_teacher_allocated_in_first_two_hours(teachers_for_subject, day, hour)
+
+                                            if is_teacher_free and is_teacher_available:
+                                                # Assign the subject to this hour
+                                                self.assign_subject(timetable, day, class_name, hour, subject_name, teachers_for_subject, category, teacher_schedule)
+                                                for teacher in teachers_for_subject:
+                                                    self.teacher_schedule[day][hour].add(teacher)
+
+                                                # Update tracking variables
+                                                theory_hours_assigned[day][class_name][subject_name] = total_hours + 1
+                                                allocated_subjects[day][class_name].add(subject_name)
+                                               
+                                                assigned_theory_hours += 1
+
+                                                # Move to the next day after assigning
+                                                break
+                                # Stop assigning if the required hours are met
+                                if assigned_theory_hours >= normal_hours:
+                                    break
+
+                            # Handle cases where not enough hours were assigned
+                            if assigned_theory_hours < normal_hours:
+                                self.allocate_missing_hours_for_subject(class_name, subject_name, timetable, theory_hours_assigned, allocated_subjects, teacher_schedule, category)
+
     
     def assign_theory_hours(self, timetable, allocated_subjects, theory_hours_assigned, teacher_schedule):
         for class_name, class_data in self.courses.items():
             for category, subjects in class_data.items():
-                if category not in ["LCA", "ELECTIVE-I",  "language","HED", "MDC","ELECTIVE-II","act"]:
+                if category not in self.catig:
                     for subject_name, subject_info in subjects.items():
+                        
                         normal_hours = subject_info["normal_hours"]
                         teachers_for_subject = subject_info["teacher_incharge"]
 
@@ -1400,12 +1524,10 @@ class TimetableGenerator:
                                     for hour in range(self.num_hours):
                                         if len(timetable[day][class_name][hour]) == 0:  # If the hour is free
                                             # Check if any teacher for the subject is available
-                                            t=any(teacher not in self.teacher_schedule[day][hour] for teacher in teachers_for_subject)
+                                            t=all(teacher not in self.teacher_schedule[day][hour] for teacher in teachers_for_subject)
                                             p=self.is_teacher_allocated_in_first_two_hours(teachers_for_subject,day,hour)
                                             if t and p:
                                                 self.assign_subject(timetable, day, class_name, hour, subject_name, teachers_for_subject, category, teacher_schedule)
-                                                for teacher in teachers_for_subject:
-                                                    self.teacher_schedule[day][hour].add(teacher)
                                                     
                                                 theory_hours_assigned[day][class_name][subject_name] = total_hours + 1
                                                 allocated_subjects[day][class_name].add(subject_name)
@@ -1533,9 +1655,15 @@ class TimetableGenerator:
         if category == "GROUP TEACHING":
             assigned_teachers = []
             for teacher in teachers_for_subject:
-                if teacher not in self.teacher_schedule[day][hour]:  # Ensure no double booking
+                
+                if teacher not in self.teacher_schedule[day][hour]:
+                    # Ensure no double booking
+                    # print(class_name,subject_name,teacher,day,hour)
                     assigned_teachers.append(teacher)
                     self.teacher_schedule[day][hour].add(teacher)  # Mark teacher as assigned for this hour
+                else:
+                    print(f"No available teachers for group teaching of {subject_name} in {class_name} on day {day}, hour {hour}.")
+                    return False  # Return False indicating assignment failed
 
             if assigned_teachers:
                 timetable[day][class_name][hour].append((subject_name, assigned_teachers))
@@ -1544,7 +1672,8 @@ class TimetableGenerator:
                 print(f"No available teachers for group teaching of {subject_name} in {class_name} on day {day}, hour {hour}.")
                 return False  # Return False indicating assignment failed
 
-        elif category == "NORMAL":
+        elif category == "NORMAL" or  category == "MATHS":
+
             if not any(subject[0] == subject_name for subject in timetable[day][class_name][hour]):
                 teacher = random.choice(teachers_for_subject)
                 if teacher not in self.teacher_schedule[day][hour]:  # Ensure no double booking
@@ -1620,7 +1749,7 @@ class TimetableGenerator:
         all_class_dfs = {}
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
-        for class_name in self.ct:
+        for class_name in self.classes:
             data = {day: [] for day in days}
 
             for day in range(self.num_days):
@@ -1637,7 +1766,7 @@ class TimetableGenerator:
                             if subject_short_name == "BLOCKED":
                                 subject_info.append(f" NA")
                             elif len(subject) == 3:  # Lab
-                                subject_info.append(f" {subject_short_name} (Lab - {subject[2]} )")
+                                subject_info.append(f" {subject_short_name} (Lab - {subject[2]} ) {teachers}")
                             else:  # Theory
                                 subject_info.append(f" {subject_short_name} ")
 
@@ -1691,16 +1820,18 @@ class TimetableGenerator:
                 for subject_info in subjects.values():
                     teachers.update(subject_info.get("teacher_incharge", []))
                     
-        for d in range(self.num_days):
-            for hr in range(self.num_hours):
-                teachers.update(self.teacher_schedule[d][hr])
+        # for d in range(self.num_days):
+        #     for hr in range(self.num_hours):
+        #         teachers.update(self.teacher_schedule[d][hr])
 
-        teachers = teachers.intersection(set(short_teachers.keys()))
+        # teachers = teachers.intersection(set(short_teachers.keys()))
        
        
 
         # Initialize a timetable for each teacher
+       
         for teacher in teachers:
+            
             data = {day: [] for day in days}
 
             for day in range(self.num_days):
@@ -1746,7 +1877,7 @@ class TimetableGenerator:
                     for class_name in self.classes:
                         subjects = timetable[day][class_name][hour]
                         for subject in subjects:
-                            if isinstance(subject, tuple) and len(subject) == 3:  # Lab subject
+                            if isinstance(subject, tuple) and len(subject) >= 3:  # Lab subject
                                 subject_name = subject[0]
                                 teachers_for_subject = subject[1]
                                 lab_venue = subject[2]
@@ -1774,7 +1905,7 @@ class TimetableGenerator:
         all_class_dfs = {}
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
-        for class_name in self.ct:
+        for class_name in self.classes:
             data = {day: [] for day in days}
 
             for day in range(self.num_days):
@@ -2044,7 +2175,26 @@ class TimetableGenerator:
 
         # Save the modified workbook
         wb.save('courses_timetable.xlsx')
+    def activity_teach(self):
+        teachers=set()
+        
+        teacher_hours=self.calculate_teacher_hours()
+        for d in range(self.num_days):
+            for hr in range(self.num_hours):
+                teachers.update(self.teacher_schedule[d][hr])
 
+        teachers = teachers.intersection(set(short_teachers.keys()))
+        l=[]
+        for i in teachers:
+            if i not in self.teacher_schedule[2][5] and (i not in self.teacher_schedule[2][0] or i not in self.teacher_schedule[2][1]):
+                if (i.lower() == "dr sagaya aurelia p".lower() and teacher_hours.get(i, 0) >= 12) or \
+                    (i.lower() == "dr manjunatha hiremath".lower() and teacher_hours.get(i, 0) >= 12) or \
+                         (i.lower() == " Dr ASHOK IMMANUEL".lower() and teacher_hours.get(i, 0) >= 6) or \
+                       (teacher_hours.get(i, 0) >= 18) :
+                        continue
+                else:
+                    l.append(i)
+        return l
         
 
 
@@ -2087,14 +2237,14 @@ if __name__ == "__main__":
             df.to_excel(writer, sheet_name=teacher_name, index=True)
     
     timetable_generator.style_and_transpose_excel_sheet('timetable.xlsx', 'timetable.xlsx')
-    timetable_generator.style_and_transpose_excel_sheet('extra_timetable.xlsx', 'extra_timetable.xlsx')
+    # timetable_generator.style_and_transpose_excel_sheet('extra_timetable.xlsx', 'extra_timetable.xlsx')
     timetable_generator.style_and_transpose_excel_sheet('Lab_timetable.xlsx', 'Lab_timetable.xlsx')
     timetable_generator.style_and_transpose_excel_sheet('teachertimetable.xlsx', 'teachertimetable.xlsx')
     
     timetable_generator.merge_sheets_to_one_wrapped("timetable.xlsx", "timetable.xlsx", 4)
     timetable_generator.merge_sheets_to_one_wrapped("courses_timetable.xlsx", "courses_timetable.xlsx", 4)
     
-    timetable_generator.merge_sheets_to_one_wrapped("extra_timetable.xlsx", "extra_timetable.xlsx", 4)
+    # timetable_generator.merge_sheets_to_one_wrapped("extra_timetable.xlsx", "extra_timetable.xlsx", 4)
     timetable_generator.merge_sheets_to_one_wrapped("Lab_timetable.xlsx", "Lab_timetable.xlsx", 4)
     timetable_generator.merge_sheets_to_one_wrapped("teachertimetable.xlsx", "teachertimetable.xlsx", 4)
     
